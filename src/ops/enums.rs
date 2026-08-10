@@ -60,6 +60,10 @@ pub enum CommandType {
     StateBlockStart = 108,
     #[strum(serialize = "STATE_BLOCK_END")]
     StateBlockEnd = 109,
+    #[strum(serialize = "PROCESS_START")]
+    ProcessStart = 110,
+    #[strum(serialize = "PROCESS_END")]
+    ProcessEnd = 111,
 }
 
 impl CommandType {
@@ -95,7 +99,9 @@ impl CommandType {
             | CommandType::OpsSectionStart
             | CommandType::OpsSectionEnd
             | CommandType::StateBlockStart
-            | CommandType::StateBlockEnd => CommandCategory::Marker,
+            | CommandType::StateBlockEnd
+            | CommandType::ProcessStart
+            | CommandType::ProcessEnd => CommandCategory::Marker,
         }
     }
 }

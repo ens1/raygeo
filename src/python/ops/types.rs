@@ -179,6 +179,12 @@ impl PyCommandType {
     #[classattr]
     pub const STATE_BLOCK_END: PyCommandType =
         PyCommandType(CommandType::StateBlockEnd);
+    #[classattr]
+    pub const PROCESS_START: PyCommandType =
+        PyCommandType(CommandType::ProcessStart);
+    #[classattr]
+    pub const PROCESS_END: PyCommandType =
+        PyCommandType(CommandType::ProcessEnd);
 
     /// String representation like ``CommandType.MOVE_TO``.
     ///

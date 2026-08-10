@@ -53,6 +53,31 @@ class TestFromPowerModulatedImage:
         )
         assert not ops.is_empty()
 
+    def test_power_quantization_preserves_scaled_output_bounds(self):
+        gray = np.array([[255, 128, 0]], dtype=np.uint8)
+        alpha = np.full_like(gray, 255)
+        ops = Ops.from_power_modulated_image(
+            gray,
+            alpha,
+            (10.0, 10.0),
+            0.0,
+            0.0,
+            0.1,
+            0.05,
+            min_power=0.0,
+            max_power=1.0,
+            step_power=0.2,
+            num_power_levels=25,
+            scan_mode=ScanMode.FULL_SWEEP,
+        )
+        samples = [
+            value
+            for index in ops.indices_of(CommandType.SCAN_LINE)
+            for value in ops.scanline_data(index)
+        ]
+        assert samples
+        assert max(samples) == round(0.2 * 255)
+
     def test_with_angle(self):
         gray = np.full((20, 20), 128, dtype=np.uint8)
         alpha = np.full((20, 20), 255, dtype=np.uint8)

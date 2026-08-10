@@ -644,6 +644,9 @@ pub fn compute_power_values(
     num_power_levels: usize,
 ) -> Vec<u8> {
     let power_range = max_power - min_power;
+    let output_min = min_power * step_power;
+    let output_max = max_power * step_power;
+    let output_range = output_max - output_min;
     let mut result = Vec::with_capacity(pixels.len());
 
     for &(px, py) in pixels {
@@ -653,19 +656,18 @@ pub fn compute_power_values(
         let mut fraction =
             min_power + (1.0 - gray as f64 / 255.0) * power_range;
         fraction *= step_power;
-        let mut pv = (fraction * 255.0).round() as u8;
         if a == 0 {
-            pv = 0;
-        }
-
-        if num_power_levels < 256 {
+            result.push(0);
+            continue;
+        } else if num_power_levels < 256 && output_range > 0.0 {
             let levels = 2.max(num_power_levels).min(256);
-            let quantized = (pv as f64 * (levels - 1) as f64 / 255.0).round()
-                * 255.0
-                / (levels - 1) as f64;
-            pv = quantized.round() as u8;
+            let normalized =
+                ((fraction - output_min) / output_range).clamp(0.0, 1.0);
+            let level = (normalized * (levels - 1) as f64).round();
+            fraction = output_min + level * output_range / (levels - 1) as f64;
         }
 
+        let pv = (fraction.clamp(0.0, 1.0) * 255.0).round() as u8;
         result.push(pv);
     }
     result

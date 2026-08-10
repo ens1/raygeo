@@ -450,6 +450,19 @@ impl Ops {
         self.invalidate_time_cache();
     }
 
+    /// Mark the beginning of a host-defined process and attach its
+    /// versioned parameter document.
+    pub fn process_start(&mut self, uid: &str, params: &str) {
+        self.cmds_mut().push(OpNode::process_start(uid, params));
+        self.invalidate_time_cache();
+    }
+
+    /// Mark the end of a host-defined process.
+    pub fn process_end(&mut self, uid: &str) {
+        self.cmds_mut().push(OpNode::process_end(uid));
+        self.invalidate_time_cache();
+    }
+
     // --- Copy / Transfer ---
 
     pub fn copy(&self) -> Self {

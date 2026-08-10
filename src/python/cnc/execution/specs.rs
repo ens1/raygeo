@@ -87,6 +87,7 @@ impl PyAggregateOutput {
 ///   Marker.JobStart(_tag=True)
 ///   Marker.LayerStart(uid="my-layer", _tag=True)
 ///   Marker.WorkpieceEnd(uid="my-wp", _tag=True)
+///   Marker.ProcessStart(uid="cut-1", params="{...}", _tag=True)
 #[gen_stub_pyclass_complex_enum]
 #[pyclass(
     name = "Marker",
@@ -107,6 +108,14 @@ pub enum PyMarker {
     WorkpieceStart { uid: String, _tag: bool },
     /// Marks the end of a workpiece with the given UID.
     WorkpieceEnd { uid: String, _tag: bool },
+    /// Marks the start of a process with versioned JSON parameters.
+    ProcessStart {
+        uid: String,
+        params: String,
+        _tag: bool,
+    },
+    /// Marks the end of a process with the given UID.
+    ProcessEnd { uid: String, _tag: bool },
 }
 
 impl PyMarker {
@@ -138,6 +147,17 @@ impl PyMarker {
                     uid: uid.clone(),
                 }
             }
+            PyMarker::ProcessStart { uid, params, .. } => {
+                crate::cnc::execution::specs::Marker::ProcessStart {
+                    uid: uid.clone(),
+                    params: params.clone(),
+                }
+            }
+            PyMarker::ProcessEnd { uid, .. } => {
+                crate::cnc::execution::specs::Marker::ProcessEnd {
+                    uid: uid.clone(),
+                }
+            }
         }
     }
 }
@@ -162,6 +182,17 @@ impl From<crate::cnc::execution::specs::Marker> for PyMarker {
             }
             crate::cnc::execution::specs::Marker::WorkpieceEnd { uid } => {
                 PyMarker::WorkpieceEnd { uid, _tag: true }
+            }
+            crate::cnc::execution::specs::Marker::ProcessStart {
+                uid,
+                params,
+            } => PyMarker::ProcessStart {
+                uid,
+                params,
+                _tag: true,
+            },
+            crate::cnc::execution::specs::Marker::ProcessEnd { uid } => {
+                PyMarker::ProcessEnd { uid, _tag: true }
             }
         }
     }
@@ -258,9 +289,21 @@ pub struct PyComputePayload {
     /// Cut speed (mm/min) injected as ``SetFeedRate``.
     #[pyo3(get, set)]
     pub cut_speed: i32,
+    /// Rapid speed (mm/min) injected as ``SetRapidRate``.
+    #[pyo3(get, set)]
+    pub rapid_speed: i32,
     /// Active head/laser UID injected as ``SetHead``.
     #[pyo3(get, set)]
     pub head_uid: Option<String>,
+    /// Air-assist state injected as ``SetAirAssist`` when provided.
+    #[pyo3(get, set)]
+    pub air_assist: Option<bool>,
+    /// Laser frequency (Hz) injected as ``SetFrequency`` when positive.
+    #[pyo3(get, set)]
+    pub frequency: i32,
+    /// Laser pulse width (µs) injected as ``SetPulseWidth`` when positive.
+    #[pyo3(get, set)]
+    pub pulse_width: f64,
     /// Print a profiling report to stdout after this node's faces have
     /// been assembled (default False).
     #[pyo3(get, set)]
@@ -271,14 +314,19 @@ pub struct PyComputePayload {
 #[pyo3::pymethods]
 impl PyComputePayload {
     #[new]
-    #[pyo3(signature = (assembler, transformers=vec![], state_source_keys=vec![], power=0.0, cut_speed=0, head_uid=None, profile=false))]
+    #[pyo3(signature = (assembler, transformers=vec![], state_source_keys=vec![], power=0.0, cut_speed=0, rapid_speed=0, head_uid=None, air_assist=None, frequency=0, pulse_width=0.0, profile=false))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         assembler: Py<PyAny>,
         transformers: Vec<Py<PyAny>>,
         state_source_keys: Vec<String>,
         power: f64,
         cut_speed: i32,
+        rapid_speed: i32,
         head_uid: Option<String>,
+        air_assist: Option<bool>,
+        frequency: i32,
+        pulse_width: f64,
         profile: bool,
     ) -> Self {
         PyComputePayload {
@@ -287,7 +335,11 @@ impl PyComputePayload {
             state_source_keys,
             power,
             cut_speed,
+            rapid_speed,
             head_uid,
+            air_assist,
+            frequency,
+            pulse_width,
             profile,
         }
     }
@@ -657,6 +709,9 @@ pub struct PyMachineTransformSpec {
     /// Key of the upstream node whose Ops to transform.
     #[pyo3(get)]
     pub source_key: String,
+    /// When true, linearize arcs before other transforms.
+    #[pyo3(get)]
+    pub linearize_arcs: bool,
     /// When true, linearize Bezier curves before other transforms.
     #[pyo3(get)]
     pub linearize_curves: bool,
@@ -684,6 +739,7 @@ impl PyMachineTransformSpec {
     ) -> crate::cnc::execution::specs::MachineTransformSpec {
         crate::cnc::execution::specs::MachineTransformSpec {
             source_key: self.source_key.clone(),
+            linearize_arcs: self.linearize_arcs,
             linearize_curves: self.linearize_curves,
             world_to_machine: self.world_to_machine,
             default_wcs_offset: self.default_wcs_offset,
@@ -704,6 +760,7 @@ impl PyMachineTransformSpec {
     #[new]
     #[pyo3(signature = (
         source_key,
+        linearize_arcs,
         linearize_curves,
         world_to_machine,
         default_wcs_offset,
@@ -715,6 +772,7 @@ impl PyMachineTransformSpec {
     fn new(
         _py: Python<'_>,
         source_key: String,
+        linearize_arcs: bool,
         linearize_curves: bool,
         world_to_machine: [[f64; 4]; 4],
         default_wcs_offset: [f64; 3],
@@ -724,6 +782,7 @@ impl PyMachineTransformSpec {
     ) -> Self {
         PyMachineTransformSpec {
             source_key,
+            linearize_arcs,
             linearize_curves,
             world_to_machine,
             default_wcs_offset,

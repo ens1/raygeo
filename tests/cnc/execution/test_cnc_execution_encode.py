@@ -31,9 +31,11 @@ from raygeo.cnc.execution.specs import (
 from raygeo.ops.assembly import Assembler
 from raygeo.ops.assembly.contour import ContourSpec
 from raygeo.ops.convert import (
+    EncodeOutput,
     Encoder,
     GcodeDialectSpec,
     GcodeSpec,
+    PythonEncoder,
     SceneSpec,
     TextureSpec,
     VertexSpec,
@@ -110,6 +112,35 @@ def test_gcode_encode_carries_machine_code():
     assert len(out.text) > 0
     assert out.power_texture is None
     assert out.repr is None
+    assert out.payload is None
+
+
+def test_machine_code_carries_opaque_payload():
+    payload = b"\x00\x88\xff"
+    out = EncodeOutput.MachineCode("program", [], [], payload)
+
+    assert out.variant == "MachineCode"
+    assert out.text == "program"
+    assert out.payload == payload
+
+
+def test_python_encoder_payload_survives_pipeline():
+    payload = b"\x00\x88\xff"
+
+    def encode(_ops):
+        return EncodeOutput.MachineCode("program", [], [], payload)
+
+    src = _compute_src()
+    enc = _encode_node(
+        "enc",
+        "src",
+        Encoder(PythonEncoder(encode, "opaque")),
+    )
+    completed, _ = collect_completions([src, enc])
+    out = encode_result(_by_key(completed)["enc"])
+
+    assert out.text == "program"
+    assert out.payload == payload
 
 
 def test_gcode_encode_text_contains_g_code_commands():

@@ -101,7 +101,29 @@ fn convert_stage(
                 } else {
                     None
                 },
+                rapid_rate: if params_ref.rapid_speed > 0 {
+                    Some(params_ref.rapid_speed)
+                } else {
+                    None
+                },
                 active_head_uid: params_ref.head_uid.clone(),
+                air_assist: params_ref.air_assist.map(|enabled| {
+                    if enabled {
+                        crate::ops::state::AirAssistMode::On
+                    } else {
+                        crate::ops::state::AirAssistMode::Off
+                    }
+                }),
+                frequency: if params_ref.frequency > 0 {
+                    Some(params_ref.frequency)
+                } else {
+                    None
+                },
+                pulse_width: if params_ref.pulse_width > 0.0 {
+                    Some(params_ref.pulse_width)
+                } else {
+                    None
+                },
                 ..Default::default()
             };
             drop(params_ref);

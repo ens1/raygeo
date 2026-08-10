@@ -318,7 +318,10 @@ impl Compute for MachineTransformCompute {
 
         let mut ops = agg_ops.clone();
 
-        // 1. Linearize curves.
+        // 1. Linearize motion forms unsupported by the backend.
+        if self.spec.linearize_arcs {
+            ops.linearize_arcs();
+        }
         if self.spec.linearize_curves {
             ops.linearize_curves();
         }

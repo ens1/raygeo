@@ -26,6 +26,7 @@ impl Ops {
             CommandType::LayerStart => CommandType::LayerEnd,
             CommandType::WorkpieceStart => CommandType::WorkpieceEnd,
             CommandType::OpsSectionStart => CommandType::OpsSectionEnd,
+            CommandType::ProcessStart => CommandType::ProcessEnd,
             CommandType::JobStart => CommandType::JobEnd,
             _ => panic!("split_at: {start_ct} is not a paired start marker"),
         };

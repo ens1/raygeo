@@ -1,6 +1,6 @@
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyByteArray, PyDict, PyType};
+use pyo3::types::{PyAny, PyByteArray, PyBytes, PyDict, PyType};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 use crate::ops::convert::{
@@ -549,11 +549,18 @@ impl PyEncodeOutput {
 impl PyEncodeOutput {
     #[classmethod]
     #[allow(non_snake_case)]
+    #[pyo3(signature = (
+        text,
+        op_to_machine_code,
+        machine_code_to_op,
+        payload=None,
+    ))]
     fn MachineCode(
         _cls: &Bound<'_, PyType>,
         text: String,
         op_to_machine_code: &Bound<'_, PyAny>,
         machine_code_to_op: &Bound<'_, PyAny>,
+        payload: Option<&Bound<'_, PyBytes>>,
     ) -> PyResult<Self> {
         use crate::ops::convert::gcode_types::{
             OpLineRange, MACHINE_CODE_TO_OP_NONE,
@@ -641,6 +648,7 @@ impl PyEncodeOutput {
 
         Ok(PyEncodeOutput::from_core(EncodeOutput::MachineCode {
             text,
+            payload: payload.map(|data| data.as_bytes().to_vec()),
             op_to_machine_code: spans,
             machine_code_to_op: mc_to_op,
         }))
@@ -681,12 +689,24 @@ impl PyEncodeOutput {
         }
     }
 
-    /// The G-code text. Returns ``None`` unless this is the
-    /// ``MachineCode`` variant.
+    /// The human-readable machine-code text. Returns ``None`` unless this is
+    /// the ``MachineCode`` variant.
     #[getter]
     fn text(&self) -> Option<String> {
         match self.enc() {
             EncodeOutput::MachineCode { text, .. } => Some(text.clone()),
+            _ => None,
+        }
+    }
+
+    /// Opaque machine-program bytes. Returns ``None`` unless supplied by the
+    /// encoder for the ``MachineCode`` variant.
+    #[getter]
+    fn payload(&self, py: Python<'_>) -> Option<Py<PyBytes>> {
+        match self.enc() {
+            EncodeOutput::MachineCode { payload, .. } => {
+                payload.as_ref().map(|data| PyBytes::new(py, data).unbind())
+            }
             _ => None,
         }
     }

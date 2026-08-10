@@ -25,6 +25,8 @@ from raygeo.geo import Geometry
 from raygeo.ops.assembly import Assembler
 from raygeo.ops.assembly.contour import ContourSpec, contour
 from raygeo.ops.part import Part
+from raygeo.ops.state import AirAssistMode
+from raygeo.ops.types import CommandType
 from raygeo.pipeline.completed import CompletedNode
 from raygeo.pipeline.execute import execute_stages
 from raygeo.pipeline.request import NodeRequest
@@ -52,6 +54,43 @@ def test_contour_compute_carries_ops():
     assert type(out).__name__ == "AssemblyOutput"
     assert out.ops is not None
     assert len(out.ops) > 0
+
+
+def test_compute_payload_emits_complete_initial_process_state():
+    payload = ComputePayload(
+        assembler=Assembler(ContourSpec()),
+        power=0.6,
+        cut_speed=900,
+        rapid_speed=4200,
+        head_uid="laser-2",
+        air_assist=True,
+        frequency=20000,
+        pulse_width=37.5,
+    )
+    node = NodeRequest(
+        key="state",
+        generation_id=1,
+        stage=StageSpec.Compute(
+            part=make_square_part(),
+            params=payload,
+        ),
+    )
+    ops = result_ops(_run_one(node))
+
+    assert ops.command_type(0) == CommandType.SET_POWER
+    assert ops.power(0) == 0.6
+    assert ops.command_type(1) == CommandType.SET_FEED_RATE
+    assert ops.rate(1) == 900
+    assert ops.command_type(2) == CommandType.SET_RAPID_RATE
+    assert ops.rate(2) == 4200
+    assert ops.command_type(3) == CommandType.SET_AIR_ASSIST
+    assert ops.air_assist(3) == AirAssistMode.ON
+    assert ops.command_type(4) == CommandType.SET_FREQUENCY
+    assert ops.frequency(4) == 20000
+    assert ops.command_type(5) == CommandType.SET_PULSE_WIDTH
+    assert ops.pulse_width(5) == 37.5
+    assert ops.command_type(6) == CommandType.SET_HEAD
+    assert ops.head_uid(6) == "laser-2"
 
 
 def test_contour_compute_source_dimensions_echoed():

@@ -548,6 +548,12 @@ pub struct PyCommandInfo {
     /// Section type, if a section marker.
     #[pyo3(get)]
     pub section_type: Option<PySectionType>,
+    /// Unique identifier of the active process, if a process marker.
+    #[pyo3(get)]
+    pub process_uid: Option<String>,
+    /// Versioned parameter document, if a ProcessStart marker.
+    #[pyo3(get)]
+    pub process_params: Option<String>,
 }
 
 #[gen_stub_pymethods]
@@ -620,6 +626,12 @@ impl PyCommandInfo {
                 return Ok(false);
             }
             if self.section_type != other_info.section_type {
+                return Ok(false);
+            }
+            if self.process_uid != other_info.process_uid {
+                return Ok(false);
+            }
+            if self.process_params != other_info.process_params {
                 return Ok(false);
             }
             if !py_pyany_eq(
@@ -1357,6 +1369,41 @@ impl PyOps {
         }
     }
 
+    /// Get the process UID from a ProcessStart or ProcessEnd command.
+    fn process_uid(&self, idx: usize) -> PyResult<String> {
+        if idx >= self.inner.len() {
+            return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
+                "index out of range",
+            ));
+        }
+        match &self.inner.commands[idx].category {
+            OpCategory::Marker(MarkerCmd::ProcessStart { uid, .. })
+            | OpCategory::Marker(MarkerCmd::ProcessEnd { uid }) => {
+                Ok(uid.to_string())
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Not a Process command",
+            )),
+        }
+    }
+
+    /// Get the versioned parameter document from a ProcessStart command.
+    fn process_params(&self, idx: usize) -> PyResult<String> {
+        if idx >= self.inner.len() {
+            return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
+                "index out of range",
+            ));
+        }
+        match &self.inner.commands[idx].category {
+            OpCategory::Marker(MarkerCmd::ProcessStart { params, .. }) => {
+                Ok(params.to_string())
+            }
+            _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Not a ProcessStart command",
+            )),
+        }
+    }
+
     /// Get the section type, optional workpiece UID, and optional raster mode from an OpsSection command.
     ///
     /// :param idx: Command index.
@@ -1746,6 +1793,19 @@ impl PyOps {
         self.inner.workpiece_end(workpiece_uid);
     }
 
+    /// Mark the start of a host-defined process.
+    ///
+    /// ``params`` is an opaque, versioned document whose schema is owned by
+    /// the host application. Raygeo preserves it verbatim.
+    fn process_start(&mut self, process_uid: &str, params: &str) {
+        self.inner.process_start(process_uid, params);
+    }
+
+    /// Mark the end of a host-defined process.
+    fn process_end(&mut self, process_uid: &str) {
+        self.inner.process_end(process_uid);
+    }
+
     /// Mark the start of an ops section.
     ///
     /// :param section_type: The type of section.
@@ -1892,7 +1952,8 @@ impl PyOps {
     /// so concatenating all returned sequences reproduces the original.
     ///
     /// :param command_type: ``CommandType.LAYER_START``,
-    ///     ``WORKPIECE_START``, ``OPS_SECTION_START``, or ``JOB_START``.
+    ///     ``WORKPIECE_START``, ``PROCESS_START``, ``OPS_SECTION_START``,
+    ///     or ``JOB_START``.
     /// :returns: A list of ``Ops`` sequences.
     /// :raises ValueError: If ``command_type`` is not a supported start marker.
     /// :complexity: O(n) time, O(n) space
@@ -1910,12 +1971,13 @@ impl PyOps {
             ct,
             CommandType::LayerStart
                 | CommandType::WorkpieceStart
+                | CommandType::ProcessStart
                 | CommandType::OpsSectionStart
                 | CommandType::JobStart
         );
         if !valid {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "unsupported marker type: {ct}. Use LAYER_START, WORKPIECE_START, OPS_SECTION_START, or JOB_START"
+                "unsupported marker type: {ct}. Use LAYER_START, WORKPIECE_START, PROCESS_START, OPS_SECTION_START, or JOB_START"
             )));
         }
         Ok(self
@@ -2127,6 +2189,8 @@ impl PyOps {
             layer_uid: None,
             workpiece_uid: None,
             section_type: None,
+            process_uid: None,
+            process_params: None,
         };
 
         if inner.commands[idx].is_moving() {
@@ -2202,6 +2266,13 @@ impl PyOps {
                 }
                 MarkerCmd::OpsSectionEnd { section_type, .. } => {
                     info.section_type = Some(PySectionType(*section_type));
+                }
+                MarkerCmd::ProcessStart { uid, params } => {
+                    info.process_uid = Some(uid.to_string());
+                    info.process_params = Some(params.to_string());
+                }
+                MarkerCmd::ProcessEnd { uid } => {
+                    info.process_uid = Some(uid.to_string());
                 }
                 _ => {}
             },

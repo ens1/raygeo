@@ -32,8 +32,14 @@ class EncodeOutput:
     @property
     def text(self) -> typing.Optional[builtins.str]:
         r"""
-        The G-code text. Returns ``None`` unless this is the
-        ``MachineCode`` variant.
+        The human-readable machine-code text. Returns ``None`` unless this is
+        the ``MachineCode`` variant.
+        """
+    @property
+    def payload(self) -> typing.Optional[bytes]:
+        r"""
+        Opaque machine-program bytes. Returns ``None`` unless supplied by the
+        encoder for the ``MachineCode`` variant.
         """
     @property
     def op_to_machine_code(self) -> typing.Optional[bytearray]:
@@ -82,7 +88,7 @@ class EncodeOutput:
         ``Texture`` variant.
         """
     @classmethod
-    def MachineCode(cls, text: builtins.str, op_to_machine_code: typing.Any, machine_code_to_op: typing.Any) -> EncodeOutput: ...
+    def MachineCode(cls, text: builtins.str, op_to_machine_code: typing.Any, machine_code_to_op: typing.Any, payload: typing.Optional[bytes] = None) -> EncodeOutput: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final

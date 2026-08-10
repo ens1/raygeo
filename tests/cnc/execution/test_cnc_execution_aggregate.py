@@ -38,6 +38,8 @@ def test_marker_variants_exist():
         "LayerEnd",
         "WorkpieceStart",
         "WorkpieceEnd",
+        "ProcessStart",
+        "ProcessEnd",
     ):
         assert hasattr(Marker, name), f"Missing Marker.{name}"
 
@@ -201,6 +203,32 @@ def test_workpiece_markers_carry_uid():
     assert cmds[0]["workpiece_uid"] == "wpu-1"
     assert cmds[-1]["type"] == "WORKPIECE_END"
     assert cmds[-1]["workpiece_uid"] == "wpu-1"
+
+
+def test_process_markers_preserve_params():
+    src = make_contour_compute("src")
+    params = '{"schema":"rayforge.process","version":1}'
+    agg = _make_aggregate(
+        "agg",
+        [
+            AggregateInput(
+                source_key="src",
+                placement_matrix=IDENTITY,
+                uid="ignored",
+                target_dimensions=(0.0, 0.0),
+            )
+        ],
+        wrap_start=[
+            Marker.ProcessStart(uid="process-1", params=params, _tag=True)
+        ],
+        wrap_end=[Marker.ProcessEnd(uid="process-1", _tag=True)],
+    )
+    completed, _ = collect_completions([src, agg])
+    ops = result_ops(_by_key(completed)["agg"])
+
+    assert ops.process_uid(0) == "process-1"
+    assert ops.process_params(0) == params
+    assert ops.process_uid(ops.len() - 1) == "process-1"
 
 
 # ── Placement matrices ────────────────────────────────────────────

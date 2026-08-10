@@ -9,6 +9,7 @@ def test_serialization_deserialization_all_types():
     ops.job_start()
     ops.layer_start("layer-1")
     ops.workpiece_start("wp-1")
+    ops.process_start("process-1", '{"schema":"test","version":1}')
     ops.ops_section_start(
         SectionType.RASTER_FILL, "wp-1", raster_mode=RasterMode.VARIABLE_POWER
     )
@@ -26,6 +27,7 @@ def test_serialization_deserialization_all_types():
         SectionType.RASTER_FILL, raster_mode=RasterMode.VARIABLE_POWER
     )
     ops.workpiece_end("wp-1")
+    ops.process_end("process-1")
     ops.layer_end("layer-1")
     ops.job_end()
     ops.last_move_to = (1, 1, 1)
@@ -38,6 +40,21 @@ def test_serialization_deserialization_all_types():
 
     for i in range(ops.len()):
         assert ops.inspect(i) == new_ops.inspect(i)
+
+
+def test_process_marker_dict_round_trip():
+    params = '{"schema":"rayforge.process","version":1}'
+    ops = Ops()
+    ops.process_start("process-1", params)
+    ops.process_end("process-1")
+
+    restored = Ops.from_dict(ops.to_dict())
+
+    assert restored.command_type(0) == CommandType.PROCESS_START
+    assert restored.process_uid(0) == "process-1"
+    assert restored.process_params(0) == params
+    assert restored.command_type(1) == CommandType.PROCESS_END
+    assert restored.process_uid(1) == "process-1"
 
 
 def test_extra_axes_to_dict_no_extra_axes():

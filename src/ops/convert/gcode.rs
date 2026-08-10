@@ -1132,6 +1132,7 @@ impl Encoder for GcodeSpec {
         ctx.callbacks.report_progress(1.0, "gcode: done");
         Ok(EncodeOutput::MachineCode {
             text: result.text,
+            payload: None,
             op_to_machine_code: result.op_to_machine_code,
             machine_code_to_op: result.machine_code_to_op,
         })

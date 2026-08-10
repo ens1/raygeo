@@ -29,6 +29,10 @@ impl OpsAggregate {
             Marker::LayerEnd { uid } => ops.layer_end(uid),
             Marker::WorkpieceStart { uid } => ops.workpiece_start(uid),
             Marker::WorkpieceEnd { uid } => ops.workpiece_end(uid),
+            Marker::ProcessStart { uid, params } => {
+                ops.process_start(uid, params)
+            }
+            Marker::ProcessEnd { uid } => ops.process_end(uid),
         }
     }
 

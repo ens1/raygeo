@@ -180,6 +180,16 @@ class CommandInfo:
         r"""
         Section type, if a section marker.
         """
+    @property
+    def process_uid(self) -> typing.Optional[builtins.str]:
+        r"""
+        Unique identifier of the active process, if a process marker.
+        """
+    @property
+    def process_params(self) -> typing.Optional[builtins.str]:
+        r"""
+        Versioned parameter document, if a ProcessStart marker.
+        """
     def __eq__(self, other: typing.Any) -> builtins.bool: ...
 
 @typing.final
@@ -561,6 +571,14 @@ class Ops:
         :raises TypeError: If the command is not a Workpiece command.
         :complexity: O(1) time, O(1) space
         """
+    def process_uid(self, idx: builtins.int) -> builtins.str:
+        r"""
+        Get the process UID from a ProcessStart or ProcessEnd command.
+        """
+    def process_params(self, idx: builtins.int) -> builtins.str:
+        r"""
+        Get the versioned parameter document from a ProcessStart command.
+        """
     def section_params(self, idx: builtins.int) -> tuple[types.SectionType, typing.Optional[builtins.str], typing.Optional[types.RasterMode]]:
         r"""
         Get the section type, optional workpiece UID, and optional raster mode from an OpsSection command.
@@ -783,6 +801,17 @@ class Ops:
         :param workpiece_uid: The workpiece identifier.
         :complexity: O(1) time, O(1) space
         """
+    def process_start(self, process_uid: builtins.str, params: builtins.str) -> None:
+        r"""
+        Mark the start of a host-defined process.
+
+        ``params`` is an opaque, versioned document whose schema is owned by
+        the host application. Raygeo preserves it verbatim.
+        """
+    def process_end(self, process_uid: builtins.str) -> None:
+        r"""
+        Mark the end of a host-defined process.
+        """
     def ops_section_start(self, section_type: types.SectionType, workpiece_uid: builtins.str, *, raster_mode: typing.Optional[types.RasterMode] = None) -> None:
         r"""
         Mark the start of an ops section.
@@ -889,7 +918,8 @@ class Ops:
         so concatenating all returned sequences reproduces the original.
         
         :param command_type: ``CommandType.LAYER_START``,
-            ``WORKPIECE_START``, ``OPS_SECTION_START``, or ``JOB_START``.
+            ``WORKPIECE_START``, ``PROCESS_START``, ``OPS_SECTION_START``,
+            or ``JOB_START``.
         :returns: A list of ``Ops`` sequences.
         :raises ValueError: If ``command_type`` is not a supported start marker.
         :complexity: O(n) time, O(n) space

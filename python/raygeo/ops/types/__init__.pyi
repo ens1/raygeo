@@ -98,6 +98,8 @@ class CommandType:
     OPS_SECTION_END: CommandType = CommandType.OPS_SECTION_END
     STATE_BLOCK_START: CommandType = CommandType.STATE_BLOCK_START
     STATE_BLOCK_END: CommandType = CommandType.STATE_BLOCK_END
+    PROCESS_START: CommandType = CommandType.PROCESS_START
+    PROCESS_END: CommandType = CommandType.PROCESS_END
     @property
     def value(self) -> builtins.int:
         r"""

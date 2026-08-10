@@ -113,6 +113,13 @@ pub enum MarkerCmd {
         name: Option<Arc<str>>,
     },
     StateBlockEnd,
+    ProcessStart {
+        uid: Arc<str>,
+        params: Arc<str>,
+    },
+    ProcessEnd {
+        uid: Arc<str>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -465,6 +472,27 @@ impl OpNode {
         }
     }
 
+    pub fn process_start(uid: &str, params: &str) -> Self {
+        OpNode {
+            category: OpCategory::Marker(MarkerCmd::ProcessStart {
+                uid: Arc::from(uid),
+                params: Arc::from(params),
+            }),
+            state: None,
+            extra_axes: None,
+        }
+    }
+
+    pub fn process_end(uid: &str) -> Self {
+        OpNode {
+            category: OpCategory::Marker(MarkerCmd::ProcessEnd {
+                uid: Arc::from(uid),
+            }),
+            state: None,
+            extra_axes: None,
+        }
+    }
+
     pub fn command_type(&self) -> CommandType {
         match &self.category {
             OpCategory::Moving { cmd, .. } => match cmd {
@@ -505,6 +533,8 @@ impl OpNode {
                     CommandType::StateBlockStart
                 }
                 MarkerCmd::StateBlockEnd => CommandType::StateBlockEnd,
+                MarkerCmd::ProcessStart { .. } => CommandType::ProcessStart,
+                MarkerCmd::ProcessEnd { .. } => CommandType::ProcessEnd,
             },
         }
     }

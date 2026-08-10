@@ -215,6 +215,16 @@ class ComputePayload:
         Cut speed (mm/min) injected as ``SetFeedRate``.
         """
     @property
+    def rapid_speed(self) -> builtins.int:
+        r"""
+        Rapid speed (mm/min) injected as ``SetRapidRate``.
+        """
+    @rapid_speed.setter
+    def rapid_speed(self, value: builtins.int) -> None:
+        r"""
+        Rapid speed (mm/min) injected as ``SetRapidRate``.
+        """
+    @property
     def head_uid(self) -> typing.Optional[builtins.str]:
         r"""
         Active head/laser UID injected as ``SetHead``.
@@ -223,6 +233,36 @@ class ComputePayload:
     def head_uid(self, value: typing.Optional[builtins.str]) -> None:
         r"""
         Active head/laser UID injected as ``SetHead``.
+        """
+    @property
+    def air_assist(self) -> typing.Optional[builtins.bool]:
+        r"""
+        Air-assist state injected as ``SetAirAssist`` when provided.
+        """
+    @air_assist.setter
+    def air_assist(self, value: typing.Optional[builtins.bool]) -> None:
+        r"""
+        Air-assist state injected as ``SetAirAssist`` when provided.
+        """
+    @property
+    def frequency(self) -> builtins.int:
+        r"""
+        Laser frequency (Hz) injected as ``SetFrequency`` when positive.
+        """
+    @frequency.setter
+    def frequency(self, value: builtins.int) -> None:
+        r"""
+        Laser frequency (Hz) injected as ``SetFrequency`` when positive.
+        """
+    @property
+    def pulse_width(self) -> builtins.float:
+        r"""
+        Laser pulse width (µs) injected as ``SetPulseWidth`` when positive.
+        """
+    @pulse_width.setter
+    def pulse_width(self, value: builtins.float) -> None:
+        r"""
+        Laser pulse width (µs) injected as ``SetPulseWidth`` when positive.
         """
     @property
     def profile(self) -> builtins.bool:
@@ -236,7 +276,7 @@ class ComputePayload:
         Print a profiling report to stdout after this node's faces have
         been assembled (default False).
         """
-    def __new__(cls, assembler: typing.Any, transformers: typing.Sequence[typing.Any] = [], state_source_keys: typing.Sequence[builtins.str] = [], power: builtins.float = 0.0, cut_speed: builtins.int = 0, head_uid: typing.Optional[builtins.str] = None, profile: builtins.bool = False) -> ComputePayload: ...
+    def __new__(cls, assembler: typing.Any, transformers: typing.Sequence[typing.Any] = [], state_source_keys: typing.Sequence[builtins.str] = [], power: builtins.float = 0.0, cut_speed: builtins.int = 0, rapid_speed: builtins.int = 0, head_uid: typing.Optional[builtins.str] = None, air_assist: typing.Optional[builtins.bool] = None, frequency: builtins.int = 0, pulse_width: builtins.float = 0.0, profile: builtins.bool = False) -> ComputePayload: ...
 
 @typing.final
 class EncodeSpec:
@@ -334,6 +374,11 @@ class MachineTransformSpec:
         Key of the upstream node whose Ops to transform.
         """
     @property
+    def linearize_arcs(self) -> builtins.bool:
+        r"""
+        When true, linearize arcs before other transforms.
+        """
+    @property
     def linearize_curves(self) -> builtins.bool:
         r"""
         When true, linearize Bezier curves before other transforms.
@@ -363,7 +408,7 @@ class MachineTransformSpec:
         r"""
         Per-layer rotary mapping configs.
         """
-    def __new__(cls, source_key: builtins.str, linearize_curves: builtins.bool, world_to_machine: typing.Sequence[typing.Sequence[builtins.float]], default_wcs_offset: typing.Sequence[builtins.float], layer_wcs_offsets: typing.Sequence[tuple[builtins.str, typing.Sequence[builtins.float]]], reverse_z: builtins.bool, rotary_mappings: typing.Sequence[RotaryMappingSpec]) -> MachineTransformSpec: ...
+    def __new__(cls, source_key: builtins.str, linearize_arcs: builtins.bool, linearize_curves: builtins.bool, world_to_machine: typing.Sequence[typing.Sequence[builtins.float]], default_wcs_offset: typing.Sequence[builtins.float], layer_wcs_offsets: typing.Sequence[tuple[builtins.str, typing.Sequence[builtins.float]]], reverse_z: builtins.bool, rotary_mappings: typing.Sequence[RotaryMappingSpec]) -> MachineTransformSpec: ...
 
 class Marker:
     r"""
@@ -375,6 +420,7 @@ class Marker:
       Marker.JobStart(_tag=True)
       Marker.LayerStart(uid="my-layer", _tag=True)
       Marker.WorkpieceEnd(uid="my-wp", _tag=True)
+      Marker.ProcessStart(uid="cut-1", params="{...}", _tag=True)
     """
     @typing.final
     class JobStart(Marker):
@@ -444,6 +490,32 @@ class Marker:
         def _tag(self) -> builtins.bool: ...
         def __new__(cls, uid: builtins.str, _tag: builtins.bool) -> Marker.WorkpieceEnd: ...
     
+    @typing.final
+    class ProcessStart(Marker):
+        r"""
+        Marks the start of a process with versioned JSON parameters.
+        """
+        __match_args__ = ("uid", "params", "_tag",)
+        @property
+        def uid(self) -> builtins.str: ...
+        @property
+        def params(self) -> builtins.str: ...
+        @property
+        def _tag(self) -> builtins.bool: ...
+        def __new__(cls, uid: builtins.str, params: builtins.str, _tag: builtins.bool) -> Marker.ProcessStart: ...
+
+    @typing.final
+    class ProcessEnd(Marker):
+        r"""
+        Marks the end of a process with the given UID.
+        """
+        __match_args__ = ("uid", "_tag",)
+        @property
+        def uid(self) -> builtins.str: ...
+        @property
+        def _tag(self) -> builtins.bool: ...
+        def __new__(cls, uid: builtins.str, _tag: builtins.bool) -> Marker.ProcessEnd: ...
+
     ...
 
 @typing.final

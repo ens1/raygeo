@@ -63,6 +63,8 @@ pub enum Marker {
     LayerEnd { uid: String },
     WorkpieceStart { uid: String },
     WorkpieceEnd { uid: String },
+    ProcessStart { uid: String, params: String },
+    ProcessEnd { uid: String },
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -83,7 +85,7 @@ pub struct AggregateOutput {
 /// Configuration for the machine-transform pipeline stage.
 ///
 /// Converts world-space Ops into machine-space Ops by applying:
-/// 1. Curve linearization (if the machine does not support curves)
+/// 1. Arc and curve linearization when required by the backend
 /// 2. Per-layer rotary axis mapping (Y→degrees)
 /// 3. World→machine coordinate transform (origin corner, reverse
 ///    axes, Z-flip) combined with the default WCS offset
@@ -93,6 +95,8 @@ pub struct AggregateOutput {
 pub struct MachineTransformSpec {
     /// Key of the upstream node whose Ops to transform.
     pub source_key: String,
+    /// When true, linearize arcs before the other transforms.
+    pub linearize_arcs: bool,
     /// When true, linearize Bezier curves before the other transforms.
     pub linearize_curves: bool,
     /// 4×4 world→machine matrix (row-major), including origin-corner

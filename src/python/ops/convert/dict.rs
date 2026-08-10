@@ -149,6 +149,13 @@ pub(crate) fn cmd_to_dict<'a>(
             }
             MarkerCmd::StateBlockStart { name: None } => {}
             MarkerCmd::StateBlockEnd => {}
+            MarkerCmd::ProcessStart { uid, params } => {
+                d.set_item("process_uid", uid.to_string())?;
+                d.set_item("process_params", params.to_string())?;
+            }
+            MarkerCmd::ProcessEnd { uid } => {
+                d.set_item("process_uid", uid.to_string())?;
+            }
             _ => {}
         },
     }
@@ -399,6 +406,26 @@ pub fn create_and_append_command(
             ops.workpiece_start(&uid);
         } else {
             ops.workpiece_end(&uid);
+        }
+    } else if ct == CommandType::ProcessStart || ct == CommandType::ProcessEnd {
+        let uid: String = cmd_data
+            .get_item("process_uid")?
+            .ok_or_else(|| {
+                pyo3::exceptions::PyKeyError::new_err("missing 'process_uid'")
+            })?
+            .extract()?;
+        if ct == CommandType::ProcessStart {
+            let params: String = cmd_data
+                .get_item("process_params")?
+                .ok_or_else(|| {
+                    pyo3::exceptions::PyKeyError::new_err(
+                        "missing 'process_params'",
+                    )
+                })?
+                .extract()?;
+            ops.process_start(&uid, &params);
+        } else {
+            ops.process_end(&uid);
         }
     } else if ct == CommandType::OpsSectionStart {
         let st_str: String = cmd_data
