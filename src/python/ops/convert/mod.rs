@@ -554,6 +554,7 @@ impl PyEncodeOutput {
         op_to_machine_code,
         machine_code_to_op,
         payload=None,
+        warnings=vec![],
     ))]
     fn MachineCode(
         _cls: &Bound<'_, PyType>,
@@ -561,6 +562,7 @@ impl PyEncodeOutput {
         op_to_machine_code: &Bound<'_, PyAny>,
         machine_code_to_op: &Bound<'_, PyAny>,
         payload: Option<&Bound<'_, PyBytes>>,
+        warnings: Vec<String>,
     ) -> PyResult<Self> {
         use crate::ops::convert::gcode_types::{
             OpLineRange, MACHINE_CODE_TO_OP_NONE,
@@ -649,6 +651,7 @@ impl PyEncodeOutput {
         Ok(PyEncodeOutput::from_core(EncodeOutput::MachineCode {
             text,
             payload: payload.map(|data| data.as_bytes().to_vec()),
+            warnings,
             op_to_machine_code: spans,
             machine_code_to_op: mc_to_op,
         }))
@@ -706,6 +709,18 @@ impl PyEncodeOutput {
         match self.enc() {
             EncodeOutput::MachineCode { payload, .. } => {
                 payload.as_ref().map(|data| PyBytes::new(py, data).unbind())
+            }
+            _ => None,
+        }
+    }
+
+    /// Non-fatal encoder warnings. Returns ``None`` unless this is the
+    /// ``MachineCode`` variant.
+    #[getter]
+    fn warnings(&self) -> Option<Vec<String>> {
+        match self.enc() {
+            EncodeOutput::MachineCode { warnings, .. } => {
+                Some(warnings.clone())
             }
             _ => None,
         }

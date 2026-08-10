@@ -113,22 +113,26 @@ def test_gcode_encode_carries_machine_code():
     assert out.power_texture is None
     assert out.repr is None
     assert out.payload is None
+    assert out.warnings == []
 
 
-def test_machine_code_carries_opaque_payload():
+def test_machine_code_carries_opaque_payload_and_warnings():
     payload = b"\x00\x88\xff"
-    out = EncodeOutput.MachineCode("program", [], [], payload)
+    warnings = ["controller owns rapid speed"]
+    out = EncodeOutput.MachineCode("program", [], [], payload, warnings)
 
     assert out.variant == "MachineCode"
     assert out.text == "program"
     assert out.payload == payload
+    assert out.warnings == warnings
 
 
 def test_python_encoder_payload_survives_pipeline():
     payload = b"\x00\x88\xff"
+    warnings = ["controller owns rapid speed"]
 
     def encode(_ops):
-        return EncodeOutput.MachineCode("program", [], [], payload)
+        return EncodeOutput.MachineCode("program", [], [], payload, warnings)
 
     src = _compute_src()
     enc = _encode_node(
@@ -141,6 +145,7 @@ def test_python_encoder_payload_survives_pipeline():
 
     assert out.text == "program"
     assert out.payload == payload
+    assert out.warnings == warnings
 
 
 def test_gcode_encode_text_contains_g_code_commands():

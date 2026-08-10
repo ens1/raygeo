@@ -6,6 +6,7 @@ use crate::ops::assembly::result::AssemblyMeta;
 use crate::ops::assembly::tracelet::Tracelet;
 use crate::ops::assembly::{AssembleCtx, Assembler};
 use crate::ops::container::Ops;
+use crate::ops::enums::{RasterMode, SectionType};
 use crate::ops::state::State;
 use crate::ops::types::{MoveCmd, OpCategory, ToolPose};
 use crate::trace_types::{Meta, MetaValue, MoveKind};
@@ -161,21 +162,32 @@ pub fn generate_material_test_grid(
 
     let is_engrave = params.mode.eq_ignore_ascii_case("engrave");
     let section_type = if is_engrave {
-        crate::ops::enums::SectionType::RasterFill
+        SectionType::RasterFill
     } else {
-        crate::ops::enums::SectionType::VectorOutline
+        SectionType::VectorOutline
     };
     let raster_mode = if is_engrave {
-        Some(crate::ops::enums::RasterMode::ConstantPower)
+        Some(RasterMode::ConstantPower)
     } else {
         None
     };
-    trace
-        .ops_section_start(section_type, "material_test_grid", raster_mode)
-        .expect("valid section params");
+    if !is_engrave {
+        trace
+            .ops_section_start(section_type, "material_test_grid", raster_mode)
+            .expect("valid section params");
+    }
 
     // Wrap labels in a state block
     if params.include_labels {
+        if is_engrave {
+            trace
+                .ops_section_start(
+                    SectionType::VectorOutline,
+                    "material_test_grid",
+                    None,
+                )
+                .expect("valid section params");
+        }
         trace.state_block_start(Some("labels"));
         let mut label_ops = Ops::new();
         generate_labels(
@@ -216,6 +228,17 @@ pub fn generate_material_test_grid(
             }
         }
         trace.state_block_end();
+        if is_engrave {
+            trace
+                .ops_section_end(SectionType::VectorOutline, None)
+                .expect("valid section params");
+        }
+    }
+
+    if is_engrave {
+        trace
+            .ops_section_start(section_type, "material_test_grid", raster_mode)
+            .expect("valid section params");
     }
 
     // Build grid cells sorted by risk: highest speed first, then lowest power

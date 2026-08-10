@@ -1,6 +1,7 @@
 """Tests for material test grid assembly module."""
 
 from raygeo.ops.assembly.material_test_grid import generate_material_test_grid
+from raygeo.ops.types import RasterMode, SectionType
 
 
 def test_generate_material_test_grid_basic():
@@ -50,6 +51,61 @@ def test_generate_material_test_grid_cut_mode():
         1 for i in range(result.ops.len()) if result.ops.is_cutting(i)
     )
     assert cut_count > 0
+
+
+def test_engrave_labels_and_cells_have_distinct_sections():
+    result = generate_material_test_grid(
+        size_mm=(200.0, 200.0),
+        mode="engrave",
+        cols=2,
+        rows=2,
+        include_labels=True,
+    )
+
+    sections = result.ops.sections()
+    assert len(sections) == 2
+    labels, cells = sections
+    assert labels.section_type == SectionType.VECTOR_OUTLINE
+    assert labels.raster_mode is None
+    assert len(labels.state_blocks_by_name(result.ops, "labels")) == 1
+    assert labels.state_blocks_by_name(result.ops, "cell-*") == []
+    assert cells.section_type == SectionType.RASTER_FILL
+    assert cells.raster_mode == RasterMode.CONSTANT_POWER
+    assert cells.state_blocks_by_name(result.ops, "labels") == []
+    assert len(cells.state_blocks_by_name(result.ops, "cell-*")) == 4
+
+
+def test_engrave_without_labels_has_only_raster_section():
+    result = generate_material_test_grid(
+        size_mm=(200.0, 200.0),
+        mode="engrave",
+        cols=2,
+        rows=2,
+        include_labels=False,
+    )
+
+    sections = result.ops.sections()
+    assert len(sections) == 1
+    assert sections[0].section_type == SectionType.RASTER_FILL
+    assert sections[0].raster_mode == RasterMode.CONSTANT_POWER
+
+
+def test_cut_labels_and_cells_preserve_single_vector_section():
+    result = generate_material_test_grid(
+        size_mm=(200.0, 200.0),
+        mode="cut",
+        cols=2,
+        rows=2,
+        include_labels=True,
+    )
+
+    sections = result.ops.sections()
+    assert len(sections) == 1
+    section = sections[0]
+    assert section.section_type == SectionType.VECTOR_OUTLINE
+    assert section.raster_mode is None
+    assert len(section.state_blocks_by_name(result.ops, "labels")) == 1
+    assert len(section.state_blocks_by_name(result.ops, "cell-*")) == 4
 
 
 def test_generate_material_test_grid_power_vs_speed():

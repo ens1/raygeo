@@ -47,6 +47,8 @@ pub enum EncodeOutput {
         text: String,
         /// Optional opaque machine-program bytes.
         payload: Option<Vec<u8>>,
+        /// Non-fatal encoder warnings for the host application.
+        warnings: Vec<String>,
         /// Op index → emitted line span ``[start, start + len)``.
         op_to_machine_code: Vec<OpLineRange>,
         /// Emitted line index → op index (``usize::MAX`` = no op).
@@ -88,11 +90,13 @@ impl EncodeOutput {
             EncodeOutput::MachineCode {
                 text,
                 payload,
+                warnings,
                 op_to_machine_code,
                 machine_code_to_op,
             } => {
                 text.len()
                     + payload.as_ref().map_or(0, Vec::len)
+                    + warnings.iter().map(String::len).sum::<usize>()
                     + op_to_machine_code.len()
                         * std::mem::size_of::<OpLineRange>()
                     + machine_code_to_op.len() * std::mem::size_of::<usize>()

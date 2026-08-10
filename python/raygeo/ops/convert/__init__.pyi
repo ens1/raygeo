@@ -3,7 +3,9 @@
 
 import builtins
 import typing
+
 from . import view
+
 __all__ = [
     "EncodeOutput",
     "Encoder",
@@ -42,11 +44,17 @@ class EncodeOutput:
         encoder for the ``MachineCode`` variant.
         """
     @property
+    def warnings(self) -> typing.Optional[builtins.list[builtins.str]]:
+        r"""
+        Non-fatal encoder warnings. Returns ``None`` unless this is the
+        ``MachineCode`` variant.
+        """
+    @property
     def op_to_machine_code(self) -> typing.Optional[bytearray]:
         r"""
         Mapping ``op_index -> (start_line, line_count)`` span. Returns
         ``None`` unless this is the ``MachineCode`` variant.
-        
+
         Returned as a :class:`bytearray` of interleaved ``i32`` pairs
         ``(start, count)`` (8 bytes per op) to avoid the per-element
         Python tuple/int overhead of a list-of-tuples.  Decode with
@@ -58,7 +66,7 @@ class EncodeOutput:
         Mapping ``machine-code line index -> op_index`` (``-1`` = no
         op). Returns ``None`` unless this is the ``MachineCode``
         variant.
-        
+
         Returned as a :class:`bytearray` of ``i32`` values (4 bytes per
         line) to avoid the per-element Python int overhead of a list.
         Decode with ``np.frombuffer(ba, dtype=np.int32)``.
@@ -88,14 +96,21 @@ class EncodeOutput:
         ``Texture`` variant.
         """
     @classmethod
-    def MachineCode(cls, text: builtins.str, op_to_machine_code: typing.Any, machine_code_to_op: typing.Any, payload: typing.Optional[bytes] = None) -> EncodeOutput: ...
+    def MachineCode(
+        cls,
+        text: builtins.str,
+        op_to_machine_code: typing.Any,
+        machine_code_to_op: typing.Any,
+        payload: typing.Optional[bytes] = None,
+        warnings: typing.Sequence[builtins.str] = [],
+    ) -> EncodeOutput: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Encoder:
     r"""
     Python-visible wrapper around an encoder spec.
-    
+
     Construct as ``Encoder(spec)`` where `spec` is an instance of one
     of the encoder spec classes under `raygeo.ops.convert` (e.g.
     :class:`~raygeo.ops.convert.GcodeSpec`). Callers that drive the
@@ -111,7 +126,7 @@ class Encoder:
     def __new__(cls, spec: typing.Any) -> Encoder:
         r"""
         Construct an `Encoder` wrapping a spec object.
-        
+
         :param spec: An encoder spec instance (e.g.
             :class:`~raygeo.ops.convert.GcodeSpec`).
         """
@@ -121,11 +136,39 @@ class Encoder:
 class GcodeDialectSpec:
     r"""
     Typed Python wrapper around the Rust ``GcodeDialectSpec``.
-    
+
     Constructed in Python with keyword arguments; the inner Rust
     struct is passed directly to the encoder without a serde round-trip.
     """
-    def __new__(cls, laser_on: builtins.str = 'M4 S{power:.0f}', laser_off: builtins.str = 'M5', tool_change: builtins.str = 'T{tool_number}', set_speed: builtins.str = 'G1 F{speed:.0f}', travel_move: builtins.str = 'G0{x_cmd}{y_cmd}{z_cmd}{extra_cmd}{f_command}{s_command}', linear_move: builtins.str = 'G1{x_cmd}{y_cmd}{z_cmd}{extra_cmd}{f_command}{s_command}', arc_cw: builtins.str = 'G2{x_cmd}{y_cmd}{z_cmd} I{i} J{j}{extra_cmd}{f_command}{s_command}', arc_ccw: builtins.str = 'G3{x_cmd}{y_cmd}{z_cmd} I{i} J{j}{extra_cmd}{f_command}{s_command}', air_assist_on: builtins.str = 'M8', air_assist_off: builtins.str = 'M9', bezier_cubic: builtins.str = '', spindle_on_cw: builtins.str = 'M3 S{rpm}', spindle_on_ccw: builtins.str = 'M4 S{rpm}', spindle_off: builtins.str = 'M5', coolant_flood: builtins.str = 'M8', coolant_mist: builtins.str = 'M7', coolant_off: builtins.str = 'M9', dwell: builtins.str = 'G4 P{seconds:.3f}', preamble: typing.Sequence[builtins.str] = ['G90'], postscript: typing.Sequence[builtins.str] = ['M30'], inject_wcs_after_preamble: builtins.bool = False, can_g0_with_speed: builtins.bool = False, omit_unchanged_coords: builtins.bool = True, continuous_laser_mode: builtins.bool = False, modal_feedrate: builtins.bool = False, gcode_precision: builtins.int = 3) -> GcodeDialectSpec: ...
+    def __new__(
+        cls,
+        laser_on: builtins.str = "M4 S{power:.0f}",
+        laser_off: builtins.str = "M5",
+        tool_change: builtins.str = "T{tool_number}",
+        set_speed: builtins.str = "G1 F{speed:.0f}",
+        travel_move: builtins.str = "G0{x_cmd}{y_cmd}{z_cmd}{extra_cmd}{f_command}{s_command}",
+        linear_move: builtins.str = "G1{x_cmd}{y_cmd}{z_cmd}{extra_cmd}{f_command}{s_command}",
+        arc_cw: builtins.str = "G2{x_cmd}{y_cmd}{z_cmd} I{i} J{j}{extra_cmd}{f_command}{s_command}",
+        arc_ccw: builtins.str = "G3{x_cmd}{y_cmd}{z_cmd} I{i} J{j}{extra_cmd}{f_command}{s_command}",
+        air_assist_on: builtins.str = "M8",
+        air_assist_off: builtins.str = "M9",
+        bezier_cubic: builtins.str = "",
+        spindle_on_cw: builtins.str = "M3 S{rpm}",
+        spindle_on_ccw: builtins.str = "M4 S{rpm}",
+        spindle_off: builtins.str = "M5",
+        coolant_flood: builtins.str = "M8",
+        coolant_mist: builtins.str = "M7",
+        coolant_off: builtins.str = "M9",
+        dwell: builtins.str = "G4 P{seconds:.3f}",
+        preamble: typing.Sequence[builtins.str] = ["G90"],
+        postscript: typing.Sequence[builtins.str] = ["M30"],
+        inject_wcs_after_preamble: builtins.bool = False,
+        can_g0_with_speed: builtins.bool = False,
+        omit_unchanged_coords: builtins.bool = True,
+        continuous_laser_mode: builtins.bool = False,
+        modal_feedrate: builtins.bool = False,
+        gcode_precision: builtins.int = 3,
+    ) -> GcodeDialectSpec: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -137,7 +180,9 @@ class GcodeSpec:
     def dialect(self) -> GcodeDialectSpec: ...
     @property
     def context_json(self) -> builtins.str: ...
-    def __new__(cls, dialect: GcodeDialectSpec, context_json: builtins.str) -> GcodeSpec: ...
+    def __new__(
+        cls, dialect: GcodeDialectSpec, context_json: builtins.str
+    ) -> GcodeSpec: ...
 
 @typing.final
 class LayerConfig:
@@ -153,13 +198,19 @@ class LayerConfig:
     @property
     def reverse(self) -> builtins.bool: ...
     def __eq__(self, other: builtins.object, /) -> builtins.bool: ...
-    def __new__(cls, rotary_enabled: builtins.bool = False, rotary_diameter: builtins.float = 0.0, axis_position: builtins.float = 0.0, reverse: builtins.bool = False) -> LayerConfig: ...
+    def __new__(
+        cls,
+        rotary_enabled: builtins.bool = False,
+        rotary_diameter: builtins.float = 0.0,
+        axis_position: builtins.float = 0.0,
+        reverse: builtins.bool = False,
+    ) -> LayerConfig: ...
 
 @typing.final
 class PythonEncoder:
     r"""
     Python-side constructor for [`PythonEncoder`].
-    
+
     Wraps a Python callable ``(ops: Ops) -> EncodeOutput`` so it can
     be driven through the Rust ``EncoderCompute`` stage. The callable
     runs under the GIL on a rayon worker thread. Use this to route
@@ -170,10 +221,12 @@ class PythonEncoder:
     def callable(self) -> typing.Any: ...
     @property
     def name(self) -> builtins.str: ...
-    def __new__(cls, callable: typing.Any, name: builtins.str) -> PythonEncoder:
+    def __new__(
+        cls, callable: typing.Any, name: builtins.str
+    ) -> PythonEncoder:
         r"""
         Construct a Python-callable encoder.
-        
+
         :param callable: A Python callable ``(ops: Ops) -> EncodeOutput``.
         :param name: Human-readable name for progress messages.
         """
@@ -185,14 +238,20 @@ class SceneSpec:
     Parameters for the 3D scene encoder.
     """
     @property
-    def world_to_visual(self) -> builtins.list[builtins.list[builtins.float]]: ...
+    def world_to_visual(
+        self,
+    ) -> builtins.list[builtins.list[builtins.float]]: ...
     @property
     def layer_configs(self) -> builtins.list[tuple[builtins.str, LayerConfig]]:
         r"""
         Stored as a list of (uid, config) pairs for hash-free equality.
         """
     def __eq__(self, other: builtins.object, /) -> builtins.bool: ...
-    def __new__(cls, world_to_visual: typing.Sequence[typing.Sequence[builtins.float]], layer_configs: dict) -> SceneSpec: ...
+    def __new__(
+        cls,
+        world_to_visual: typing.Sequence[typing.Sequence[builtins.float]],
+        layer_configs: dict,
+    ) -> SceneSpec: ...
 
 @typing.final
 class TextureSpec:
@@ -208,7 +267,13 @@ class TextureSpec:
     @property
     def origin_mm(self) -> tuple[builtins.float, builtins.float]: ...
     def __eq__(self, other: builtins.object, /) -> builtins.bool: ...
-    def __new__(cls, width_px: builtins.int, height_px: builtins.int, px_per_mm: tuple[builtins.float, builtins.float], origin_mm: tuple[builtins.float, builtins.float]) -> TextureSpec: ...
+    def __new__(
+        cls,
+        width_px: builtins.int,
+        height_px: builtins.int,
+        px_per_mm: tuple[builtins.float, builtins.float],
+        origin_mm: tuple[builtins.float, builtins.float],
+    ) -> TextureSpec: ...
 
 @typing.final
 class VertexSpec:
@@ -230,7 +295,11 @@ class ViewSpec:
     @property
     def show_travel_moves(self) -> builtins.bool: ...
     @property
-    def render_bbox(self) -> tuple[builtins.float, builtins.float, builtins.float, builtins.float]: ...
+    def render_bbox(
+        self,
+    ) -> tuple[
+        builtins.float, builtins.float, builtins.float, builtins.float
+    ]: ...
     @property
     def max_dimension_px(self) -> builtins.int: ...
     @property
@@ -245,6 +314,19 @@ class ViewSpec:
     def cut_lut(self) -> builtins.list[builtins.list[builtins.int]]: ...
     @property
     def engrave_lut(self) -> builtins.list[builtins.list[builtins.int]]: ...
-    def __new__(cls, pixels_per_mm: tuple[builtins.float, builtins.float], render_bbox: tuple[builtins.float, builtins.float, builtins.float, builtins.float], cut_color: typing.Sequence[builtins.int], travel_color: typing.Sequence[builtins.int], zero_power_color: typing.Sequence[builtins.int], cut_lut: typing.Sequence[typing.Sequence[builtins.int]], engrave_lut: typing.Sequence[typing.Sequence[builtins.int]], show_travel_moves: builtins.bool = True, max_dimension_px: builtins.int = 8192, max_total_pixels: builtins.int = 67108864) -> ViewSpec: ...
+    def __new__(
+        cls,
+        pixels_per_mm: tuple[builtins.float, builtins.float],
+        render_bbox: tuple[
+            builtins.float, builtins.float, builtins.float, builtins.float
+        ],
+        cut_color: typing.Sequence[builtins.int],
+        travel_color: typing.Sequence[builtins.int],
+        zero_power_color: typing.Sequence[builtins.int],
+        cut_lut: typing.Sequence[typing.Sequence[builtins.int]],
+        engrave_lut: typing.Sequence[typing.Sequence[builtins.int]],
+        show_travel_moves: builtins.bool = True,
+        max_dimension_px: builtins.int = 8192,
+        max_total_pixels: builtins.int = 67108864,
+    ) -> ViewSpec: ...
     def __repr__(self) -> builtins.str: ...
-
