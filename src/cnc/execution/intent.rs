@@ -56,6 +56,7 @@ pub fn create_intent(
         let assembler = Arc::clone(&step.spec);
         let compute = AssemblerCompute {
             assembler,
+            workpiece_uid: String::new(),
             part: part.clone(),
             face_id: step.face_id.clone(),
             transformers: Vec::new(),

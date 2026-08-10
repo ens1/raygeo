@@ -14,6 +14,7 @@ use crate::ops::container::Ops;
 use crate::ops::enums::{CommandCategory, CommandType};
 use crate::ops::state::State;
 use crate::ops::transform::{Phase, TransformCtx, Transformer};
+use crate::ops::types::{OpCategory, StateCmd};
 
 const TWO_OPT_SEGMENT_THRESHOLD: usize = 1000;
 const TWO_OPT_COMMAND_LIMIT: usize = 10000;
@@ -63,10 +64,23 @@ impl Transformer for OptimizeSpec {
 #[derive(Clone)]
 struct WorkpieceMeta {
     uid: String,
+    prelude: Ops,
     ops: Ops,
     entry_point: Point3D,
     exit_point: Point3D,
     can_flip: bool,
+}
+
+struct WorkpieceBlock {
+    uid: String,
+    prelude: Ops,
+    ops: Ops,
+}
+
+struct WorkpieceLayout {
+    prefix: Ops,
+    blocks: Vec<WorkpieceBlock>,
+    suffix: Ops,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -127,51 +141,80 @@ fn can_flip(ops: &Ops) -> bool {
     false
 }
 
-fn split_by_workpiece_markers(ops: &Ops) -> Vec<(String, Ops)> {
-    let mut blocks: Vec<(String, Ops)> = Vec::new();
+fn split_by_workpiece_markers(ops: &Ops) -> Option<WorkpieceLayout> {
+    let mut prefix = Ops::new();
+    let mut blocks = Vec::new();
+    let mut pending = Ops::new();
     let mut current_uid: Option<String> = None;
     let mut current_block = Ops::new();
+    let mut current_prelude = Ops::new();
 
     for i in 0..ops.len() {
         let ct = ops.command_type(i);
         if ct == CommandType::WorkpieceStart {
+            if current_uid.is_some() {
+                return None;
+            }
+            if blocks.is_empty() {
+                prefix.extend(&pending);
+            } else {
+                if (0..pending.len())
+                    .any(|j| pending.category(j) != CommandCategory::State)
+                {
+                    return None;
+                }
+                current_prelude.extend(&pending);
+            }
+            pending.clear();
             current_uid = Some(ops.workpiece_uid(i).to_string());
             current_block = Ops::new();
         } else if ct == CommandType::WorkpieceEnd {
-            if let Some(uid) = current_uid.take() {
-                blocks.push((uid, current_block.clone()));
+            let uid = current_uid.take()?;
+            if uid != ops.workpiece_uid(i) {
+                return None;
             }
+            blocks.push(WorkpieceBlock {
+                uid,
+                prelude: current_prelude.clone(),
+                ops: current_block.clone(),
+            });
             current_block = Ops::new();
-        } else if ops.category(i) == CommandCategory::Moving
-            && current_uid.is_some()
-        {
+            current_prelude = Ops::new();
+        } else if current_uid.is_some() {
             current_block.transfer_command_from(ops, i);
+        } else {
+            pending.transfer_command_from(ops, i);
         }
     }
 
-    if let Some(uid) = current_uid {
-        if !current_block.is_empty() {
-            blocks.push((uid, current_block));
-        }
-    }
-
-    blocks
-}
-
-fn extract_workpiece_meta(uid: &str, ops: &Ops) -> Option<WorkpieceMeta> {
-    if ops.is_empty() {
+    if current_uid.is_some() {
         return None;
     }
 
-    let entry_point = find_pass_entry(ops)?;
-    let exit_point = find_pass_exit(ops)?;
+    Some(WorkpieceLayout {
+        prefix,
+        blocks,
+        suffix: pending,
+    })
+}
+
+fn extract_workpiece_meta(block: &WorkpieceBlock) -> Option<WorkpieceMeta> {
+    if block.ops.is_empty() {
+        return None;
+    }
+
+    let entry_point = find_pass_entry(&block.ops)?;
+    let exit_point = find_pass_exit(&block.ops)?;
+    let motion_only = (0..block.ops.len())
+        .all(|i| block.ops.category(i) == CommandCategory::Moving);
 
     Some(WorkpieceMeta {
-        uid: uid.to_string(),
-        ops: ops.clone(),
+        uid: block.uid.clone(),
+        prelude: block.prelude.clone(),
+        ops: block.ops.clone(),
         entry_point,
         exit_point,
-        can_flip: can_flip(ops),
+        can_flip: motion_only && can_flip(&block.ops),
     })
 }
 
@@ -230,6 +273,7 @@ fn kdtree_order_workpieces(metas: &mut [WorkpieceMeta]) -> Vec<WorkpieceMeta> {
         if next_meta.can_flip && sp.is_exit {
             next_meta = WorkpieceMeta {
                 uid: next_meta.uid.clone(),
+                prelude: next_meta.prelude.clone(),
                 ops: next_meta.ops.flip_ops(),
                 entry_point: next_meta.exit_point,
                 exit_point: next_meta.entry_point,
@@ -275,6 +319,10 @@ fn two_opt_workpieces(
         improved = false;
         for i in 0..n - 2 {
             for j in i + 2..n {
+                if !ordered[i + 1..=j].iter().all(|item| item.can_flip) {
+                    continue;
+                }
+
                 let a_exit = ordered[i].exit_point;
                 let b_entry = ordered[i + 1].entry_point;
                 let e_exit = ordered[j].exit_point;
@@ -296,6 +344,7 @@ fn two_opt_workpieces(
                         if item.can_flip {
                             *item = WorkpieceMeta {
                                 uid: item.uid.clone(),
+                                prelude: item.prelude.clone(),
                                 ops: item.ops.flip_ops(),
                                 entry_point: item.exit_point,
                                 exit_point: item.entry_point,
@@ -636,7 +685,68 @@ fn sync_state_commands(ops: &mut Ops, state: &State, prev: &State) -> State {
             prev.active_head_uid = Some(uid.clone());
         }
     }
+    if let Some(frequency) = state.frequency {
+        if prev.frequency != Some(frequency) {
+            ops.set_frequency(frequency);
+            prev.frequency = Some(frequency);
+        }
+    }
+    if let Some(pulse_width) = state.pulse_width {
+        if prev.pulse_width != Some(pulse_width) {
+            ops.set_pulse_width(pulse_width);
+            prev.pulse_width = Some(pulse_width);
+        }
+    }
+    if let Some(spindle_rpm) = state.spindle_rpm {
+        if prev.spindle_rpm != Some(spindle_rpm) {
+            ops.set_spindle_rpm(spindle_rpm);
+            prev.spindle_rpm = Some(spindle_rpm);
+        }
+    }
     prev
+}
+
+fn apply_state_command(prev: &mut State, cmd: &StateCmd) {
+    match cmd {
+        StateCmd::SetPower(power) => prev.power = *power,
+        StateCmd::SetFeedRate(feed_rate) => prev.feed_rate = Some(*feed_rate),
+        StateCmd::SetRapidRate(rapid_rate) => {
+            prev.rapid_rate = Some(*rapid_rate)
+        }
+        StateCmd::Dwell(duration_ms) => prev.dwell_ms = Some(*duration_ms),
+        StateCmd::SetHead(uid) => prev.active_head_uid = Some(uid.to_string()),
+        StateCmd::SetFrequency(frequency) => prev.frequency = Some(*frequency),
+        StateCmd::SetPulseWidth(pulse_width) => {
+            prev.pulse_width = Some(*pulse_width)
+        }
+        StateCmd::SetSpindleRpm(spindle_rpm) => {
+            prev.spindle_rpm = Some(*spindle_rpm)
+        }
+        StateCmd::SetCoolant(mode) => prev.coolant = Some(*mode),
+        StateCmd::SetAirAssist(mode) => prev.air_assist = Some(*mode),
+        StateCmd::SetHeadCoolant(mode) => prev.head_coolant = Some(*mode),
+    }
+}
+
+fn transfer_with_state(
+    target: &mut Ops,
+    source: &Ops,
+    idx: usize,
+    prev: &mut State,
+) {
+    if let Some(state) = source.state(idx) {
+        *prev = sync_state_commands(target, state, prev);
+    }
+    target.transfer_command_from(source, idx);
+    if let OpCategory::State(cmd) = &source.commands[idx].category {
+        apply_state_command(prev, cmd);
+    }
+}
+
+fn transfer_all_with_state(target: &mut Ops, source: &Ops, prev: &mut State) {
+    for idx in 0..source.len() {
+        transfer_with_state(target, source, idx, prev);
+    }
 }
 
 /// Optimize travel distance in an Ops sequence.
@@ -663,11 +773,11 @@ pub fn optimize_travel(
 ) {
     ops.preload_state();
 
-    let blocks = split_by_workpiece_markers(ops);
-    if blocks.len() >= 2 {
+    let layout = split_by_workpiece_markers(ops);
+    if layout.as_ref().is_some_and(|item| item.blocks.len() >= 2) {
         optimize_workpiece_order(
             ops,
-            &blocks,
+            layout.as_ref().expect("layout checked above"),
             allow_flip,
             preserve_first,
             &preserve_order,
@@ -685,7 +795,7 @@ fn report_progress(callbacks: &dyn Callbacks, progress: f64, message: &str) {
 
 fn optimize_workpiece_order(
     ops: &mut Ops,
-    blocks: &[(String, Ops)],
+    layout: &WorkpieceLayout,
     allow_flip: bool,
     preserve_first: bool,
     preserve_order: &[String],
@@ -694,8 +804,8 @@ fn optimize_workpiece_order(
     report_progress(callbacks, 0.0, "Analyzing workpieces...");
 
     let mut metas: Vec<WorkpieceMeta> = Vec::new();
-    for (uid, block_ops) in blocks {
-        if let Some(mut meta) = extract_workpiece_meta(uid, block_ops) {
+    for block in &layout.blocks {
+        if let Some(mut meta) = extract_workpiece_meta(block) {
             if !allow_flip {
                 meta.can_flip = false;
             }
@@ -703,7 +813,7 @@ fn optimize_workpiece_order(
         }
     }
 
-    if metas.len() < 2 {
+    if metas.len() != layout.blocks.len() || metas.len() < 2 {
         return;
     }
 
@@ -744,29 +854,32 @@ fn optimize_workpiece_order(
                 reorder_idx += 1;
             }
         }
-        reassemble_workpieces(ops, &final_metas);
+        reassemble_workpieces(ops, layout, &final_metas);
     } else {
-        reassemble_workpieces(ops, &ordered_metas);
+        reassemble_workpieces(ops, layout, &ordered_metas);
     }
 
     report_progress(callbacks, 1.0, "Workpiece optimization complete");
 }
 
-fn reassemble_workpieces(ops: &mut Ops, ordered_metas: &[WorkpieceMeta]) {
-    ops.preload_state();
+fn reassemble_workpieces(
+    ops: &mut Ops,
+    layout: &WorkpieceLayout,
+    ordered_metas: &[WorkpieceMeta],
+) {
     ops.clear();
 
     let mut prev = State::default();
+    transfer_all_with_state(ops, &layout.prefix, &mut prev);
     for meta in ordered_metas {
+        transfer_all_with_state(ops, &meta.prelude, &mut prev);
         ops.workpiece_start(&meta.uid);
         for j in 0..meta.ops.len() {
-            if let Some(state) = meta.ops.state(j) {
-                prev = sync_state_commands(ops, state, &prev);
-            }
-            ops.transfer_command_from(&meta.ops, j);
+            transfer_with_state(ops, &meta.ops, j, &mut prev);
         }
         ops.workpiece_end(&meta.uid);
     }
+    transfer_all_with_state(ops, &layout.suffix, &mut prev);
 }
 
 fn optimize_segments(

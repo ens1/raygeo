@@ -41,6 +41,7 @@ from raygeo.ops.assembly import Assembler
 from raygeo.ops.assembly.contour import ContourSpec
 from raygeo.ops.convert import Encoder, GcodeDialectSpec, GcodeSpec
 from raygeo.ops.part import Part
+from raygeo.ops.types import CommandCategory, CommandType, SectionType
 from raygeo.pipeline.completed import CompletedNode
 from raygeo.pipeline.execute import Pipeline, execute_stages
 from raygeo.pipeline.request import NodeRequest
@@ -237,6 +238,37 @@ def _by_key(completed):
     return {c.key: c for c in completed}
 
 
+def _count_category(ops: Ops, category: CommandCategory) -> int:
+    return sum(ops.category(i) == category for i in range(ops.len()))
+
+
+def _assert_contour_copies(ops: Ops, expected_uids: list[str]) -> None:
+    depth = 0
+    section_uids = []
+    for i in range(ops.len()):
+        command = ops.command_type(i)
+        if command == CommandType.OPS_SECTION_START:
+            assert depth == 0
+            section_type, uid, raster_mode = ops.section_params(i)
+            assert section_type == SectionType.VECTOR_OUTLINE
+            assert raster_mode is None
+            section_uids.append(uid)
+            depth = 1
+        elif command == CommandType.OPS_SECTION_END:
+            assert depth == 1
+            depth = 0
+
+    assert depth == 0
+    assert section_uids == expected_uids
+    assert _count_category(ops, CommandCategory.MOVING) == 5 * len(
+        expected_uids
+    )
+    assert _count_category(ops, CommandCategory.STATE) == len(expected_uids)
+    assert _count_category(ops, CommandCategory.MARKER) == 2 * len(
+        expected_uids
+    )
+
+
 # ── Single-source ─────────────────────────────────────────────────
 
 
@@ -250,11 +282,11 @@ def test_single_source_topology_completes_both():
 
 
 def test_single_source_aggregate_consumes_compute_ops():
-    src = make_contour_compute("src")
+    src = make_contour_compute("src", workpiece_uid="src")
     agg = _agg("agg", ["src"])
     completed, _ = collect_completions([src, agg])
     out = aggregate_result(_by_key(completed)["agg"])
-    assert len(out.ops) == 6
+    _assert_contour_copies(out.ops, ["src"])
 
 
 # ── Multi-source ──────────────────────────────────────────────────
@@ -282,18 +314,20 @@ def test_multi_source_aggregate_concatenates_ops():
 
 
 def test_aggregate_over_three_sources():
-    srcs = [make_contour_compute(f"s{i}") for i in range(3)]
+    srcs = [
+        make_contour_compute(f"s{i}", workpiece_uid=f"s{i}") for i in range(3)
+    ]
     agg = _agg("agg", ["s0", "s1", "s2"])
     completed, _ = collect_completions(srcs + [agg])
     out = aggregate_result(_by_key(completed)["agg"])
-    assert len(out.ops) == 18
+    _assert_contour_copies(out.ops, ["s0", "s1", "s2"])
 
 
 # ── Chain ─────────────────────────────────────────────────────────
 
 
 def test_chain_topology_compute_agg_agg():
-    src = make_contour_compute("src")
+    src = make_contour_compute("src", workpiece_uid="src")
     inner = _agg("inner", ["src"])
     outer = _agg("outer", ["inner"])
     completed, _ = collect_completions([src, inner, outer])
@@ -302,7 +336,7 @@ def test_chain_topology_compute_agg_agg():
         out = by_key[k].output
         assert out is not None
         assert by_key[k].error is None
-        assert len(result_ops(by_key[k])) == 6
+        _assert_contour_copies(result_ops(by_key[k]), ["src"])
 
 
 # ── Encode on top of aggregate ────────────────────────────────────
@@ -373,7 +407,7 @@ def test_partial_external_source_in_topology():
 
 
 def test_diamond_topology():
-    a = make_contour_compute("a")
+    a = make_contour_compute("a", workpiece_uid="a")
     left = _agg("left", ["a"])
     right = _agg("right", ["a"])
     agg = _agg("agg", ["left", "right"])
@@ -382,7 +416,7 @@ def test_diamond_topology():
     assert keys == {"a", "left", "right", "agg"}
     assert all(c.error is None for c in completed)
     out = aggregate_result(_by_key(completed)["agg"])
-    assert len(out.ops) == 12
+    _assert_contour_copies(out.ops, ["a", "a"])
 
 
 # ── Single-source identity properties ─────────────────────────────

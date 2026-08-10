@@ -263,6 +263,7 @@ impl PyMachineParams {
 /// ``Any`` — the CNC converter unpacks it during traversal.
 ///
 /// :param assembler: The assembler spec that drives this compute.
+/// :param workpiece_uid: Stable identifier for section ownership.
 /// :param transformers: Optional list of transformer specs.
 /// :param state_source_keys: Keys of upstream nodes whose cleared-area
 ///     state should be threaded into this compute (CNC only).
@@ -277,6 +278,9 @@ pub struct PyComputePayload {
     /// The assembler spec (e.g. ``ContourSpec``, ``AdaptiveClearingSpec``).
     #[pyo3(get)]
     pub assembler: Py<PyAny>,
+    /// Stable workpiece identifier copied into emitted Ops sections.
+    #[pyo3(get, set)]
+    pub workpiece_uid: String,
     /// Optional list of transformer specs applied post-assembly.
     #[pyo3(get, set)]
     pub transformers: Vec<Py<PyAny>>,
@@ -314,7 +318,7 @@ pub struct PyComputePayload {
 #[pyo3::pymethods]
 impl PyComputePayload {
     #[new]
-    #[pyo3(signature = (assembler, transformers=vec![], state_source_keys=vec![], power=0.0, cut_speed=0, rapid_speed=0, head_uid=None, air_assist=None, frequency=0, pulse_width=0.0, profile=false))]
+    #[pyo3(signature = (assembler, transformers=vec![], state_source_keys=vec![], power=0.0, cut_speed=0, rapid_speed=0, head_uid=None, air_assist=None, frequency=0, pulse_width=0.0, profile=false, workpiece_uid=String::new()))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         assembler: Py<PyAny>,
@@ -328,9 +332,11 @@ impl PyComputePayload {
         frequency: i32,
         pulse_width: f64,
         profile: bool,
+        workpiece_uid: String,
     ) -> Self {
         PyComputePayload {
             assembler,
+            workpiece_uid,
             transformers,
             state_source_keys,
             power,

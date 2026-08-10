@@ -56,8 +56,13 @@ impl Assembler for MaterialTestGridSpec {
         if ctx.callbacks.is_cancelled() {
             return Err("cancelled".to_string());
         }
-        let meta = generate_material_test_grid(self, ctx.trace, ctx.state)
-            .map_err(|e| e.to_string())?;
+        let meta = generate_material_test_grid(
+            self,
+            ctx.trace,
+            ctx.state,
+            &ctx.workpiece_uid,
+        )
+        .map_err(|e| e.to_string())?;
         ctx.callbacks
             .report_progress(1.0, "material_test_grid: done");
         Ok(meta)
@@ -85,6 +90,7 @@ pub fn generate_material_test_grid(
     params: &MaterialTestGridSpec,
     trace: &mut Tracelet,
     base_state: &State,
+    workpiece_uid: &str,
 ) -> Result<AssemblyMeta, crate::RaygeoError> {
     let size_mm = params.size_mm;
     let (_target_width, target_height) = size_mm;
@@ -173,7 +179,7 @@ pub fn generate_material_test_grid(
     };
     if !is_engrave {
         trace
-            .ops_section_start(section_type, "material_test_grid", raster_mode)
+            .ops_section_start(section_type, workpiece_uid, raster_mode)
             .expect("valid section params");
     }
 
@@ -183,7 +189,7 @@ pub fn generate_material_test_grid(
             trace
                 .ops_section_start(
                     SectionType::VectorOutline,
-                    "material_test_grid",
+                    workpiece_uid,
                     None,
                 )
                 .expect("valid section params");
@@ -237,7 +243,7 @@ pub fn generate_material_test_grid(
 
     if is_engrave {
         trace
-            .ops_section_start(section_type, "material_test_grid", raster_mode)
+            .ops_section_start(section_type, workpiece_uid, raster_mode)
             .expect("valid section params");
     }
 

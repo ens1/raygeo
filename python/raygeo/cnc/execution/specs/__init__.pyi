@@ -165,6 +165,7 @@ class ComputePayload:
     ``Any`` — the CNC converter unpacks it during traversal.
     
     :param assembler: The assembler spec that drives this compute.
+    :param workpiece_uid: Stable identifier for section ownership.
     :param transformers: Optional list of transformer specs.
     :param state_source_keys: Keys of upstream nodes whose cleared-area
         state should be threaded into this compute (CNC only).
@@ -173,6 +174,16 @@ class ComputePayload:
     def assembler(self) -> typing.Any:
         r"""
         The assembler spec (e.g. ``ContourSpec``, ``AdaptiveClearingSpec``).
+        """
+    @property
+    def workpiece_uid(self) -> builtins.str:
+        r"""
+        Stable workpiece identifier copied into emitted Ops sections.
+        """
+    @workpiece_uid.setter
+    def workpiece_uid(self, value: builtins.str) -> None:
+        r"""
+        Stable workpiece identifier copied into emitted Ops sections.
         """
     @property
     def transformers(self) -> builtins.list[typing.Any]:
@@ -276,7 +287,7 @@ class ComputePayload:
         Print a profiling report to stdout after this node's faces have
         been assembled (default False).
         """
-    def __new__(cls, assembler: typing.Any, transformers: typing.Sequence[typing.Any] = [], state_source_keys: typing.Sequence[builtins.str] = [], power: builtins.float = 0.0, cut_speed: builtins.int = 0, rapid_speed: builtins.int = 0, head_uid: typing.Optional[builtins.str] = None, air_assist: typing.Optional[builtins.bool] = None, frequency: builtins.int = 0, pulse_width: builtins.float = 0.0, profile: builtins.bool = False) -> ComputePayload: ...
+    def __new__(cls, assembler: typing.Any, transformers: typing.Sequence[typing.Any] = [], state_source_keys: typing.Sequence[builtins.str] = [], power: builtins.float = 0.0, cut_speed: builtins.int = 0, rapid_speed: builtins.int = 0, head_uid: typing.Optional[builtins.str] = None, air_assist: typing.Optional[builtins.bool] = None, frequency: builtins.int = 0, pulse_width: builtins.float = 0.0, profile: builtins.bool = False, workpiece_uid: builtins.str = '') -> ComputePayload: ...
 
 @typing.final
 class EncodeSpec:

@@ -342,6 +342,7 @@ fn raster_py(
     let (ops, meta) = assemble_raster(
         image_src.as_ref(),
         pixels_per_mm,
+        "",
         alpha_buf.as_deref(),
         mode,
         line_interval_mm,

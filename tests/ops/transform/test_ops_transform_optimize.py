@@ -4,7 +4,7 @@ import pytest
 
 from raygeo.ops import Ops
 from raygeo.ops.state import AirAssistMode, CoolantMode
-from raygeo.ops.types import CommandCategory, CommandType
+from raygeo.ops.types import CommandCategory, CommandType, SectionType
 
 
 def _make_seg(start, end):
@@ -294,6 +294,124 @@ class TestOptimizeWorkpieceLevel:
         ops.workpiece_end("wp-b")
         ops.optimize_travel(allow_flip=True)
         assert _count_cuts(ops) == 2
+
+    def test_single_workpiece_preserves_process_and_section(self):
+        ops = Ops()
+        ops.process_start("process", '{"version":1}')
+        ops.workpiece_start("wp")
+        ops.ops_section_start(SectionType.VECTOR_OUTLINE, "wp")
+        ops.move_to(0, 0)
+        ops.line_to(10, 0)
+        ops.ops_section_end(SectionType.VECTOR_OUTLINE)
+        ops.workpiece_end("wp")
+        ops.process_end("process")
+
+        ops.optimize_travel()
+
+        structural = [
+            ops.command_type(i)
+            for i in range(ops.len())
+            if ops.category(i) == CommandCategory.MARKER
+        ]
+        assert structural == [
+            CommandType.PROCESS_START,
+            CommandType.WORKPIECE_START,
+            CommandType.OPS_SECTION_START,
+            CommandType.OPS_SECTION_END,
+            CommandType.WORKPIECE_END,
+            CommandType.PROCESS_END,
+        ]
+
+    def test_reorder_preserves_nested_structure_and_state(self):
+        ops = Ops()
+        ops.process_start("process", '{"version":1}')
+        for uid, x, power in [
+            ("wp-a", 0.0, 0.2),
+            ("wp-c", 200.0, 0.6),
+            ("wp-b", 10.0, 0.4),
+        ]:
+            ops.workpiece_start(uid)
+            ops.ops_section_start(SectionType.VECTOR_OUTLINE, uid)
+            ops.set_power(power)
+            ops.move_to(x, 0)
+            ops.line_to(x + 5, 0)
+            ops.ops_section_end(SectionType.VECTOR_OUTLINE)
+            ops.workpiece_end(uid)
+        ops.process_end("process")
+
+        ops.optimize_travel(allow_flip=True)
+        ops.preload_state()
+
+        structural = [
+            ops.command_type(i)
+            for i in range(ops.len())
+            if ops.category(i) == CommandCategory.MARKER
+        ]
+        assert structural == [
+            CommandType.PROCESS_START,
+            CommandType.WORKPIECE_START,
+            CommandType.OPS_SECTION_START,
+            CommandType.OPS_SECTION_END,
+            CommandType.WORKPIECE_END,
+            CommandType.WORKPIECE_START,
+            CommandType.OPS_SECTION_START,
+            CommandType.OPS_SECTION_END,
+            CommandType.WORKPIECE_END,
+            CommandType.WORKPIECE_START,
+            CommandType.OPS_SECTION_START,
+            CommandType.OPS_SECTION_END,
+            CommandType.WORKPIECE_END,
+            CommandType.PROCESS_END,
+        ]
+        workpiece_order = [
+            ops.workpiece_uid(i)
+            for i in range(ops.len())
+            if ops.command_type(i) == CommandType.WORKPIECE_START
+        ]
+        assert workpiece_order == ["wp-a", "wp-b", "wp-c"]
+
+        expected_power = {"wp-a": 0.2, "wp-b": 0.4, "wp-c": 0.6}
+        active_uid = None
+        observed_power = {}
+        for i in range(ops.len()):
+            command_type = ops.command_type(i)
+            if command_type == CommandType.WORKPIECE_START:
+                active_uid = ops.workpiece_uid(i)
+            elif command_type == CommandType.WORKPIECE_END:
+                active_uid = None
+            elif (
+                command_type == CommandType.LINE_TO and active_uid is not None
+            ):
+                state = ops.state(i)
+                assert state is not None
+                observed_power[active_uid] = state.power
+        assert observed_power == pytest.approx(expected_power)
+
+    def test_two_opt_does_not_reverse_non_flippable_workpieces(self):
+        ops = Ops()
+        ops.set_power(1.0)
+        ops.process_start("process", '{"version":1}')
+        for uid, start, end in [
+            ("wp-a", (-1.0, 0.0), (0.0, 0.0)),
+            ("wp-b", (100.0, 0.0), (1.0, 0.0)),
+            ("wp-c", (2.0, 0.0), (-10.0, 0.0)),
+        ]:
+            ops.workpiece_start(uid)
+            ops.ops_section_start(SectionType.VECTOR_OUTLINE, uid)
+            ops.move_to(*start)
+            ops.line_to(*end)
+            ops.ops_section_end(SectionType.VECTOR_OUTLINE)
+            ops.workpiece_end(uid)
+        ops.process_end("process")
+
+        ops.optimize_travel(allow_flip=True)
+
+        workpiece_order = [
+            ops.workpiece_uid(i)
+            for i in range(ops.len())
+            if ops.command_type(i) == CommandType.WORKPIECE_START
+        ]
+        assert workpiece_order == ["wp-a", "wp-b", "wp-c"]
 
 
 class TestOptimizeStateBoundaries:

@@ -19,6 +19,7 @@ use crate::prof::prof_report;
 
 pub struct AssemblerCompute {
     pub assembler: Arc<dyn Assembler>,
+    pub workpiece_uid: String,
     pub part: Part,
     pub face_id: String,
     pub transformers: Vec<Box<dyn Transformer>>,
@@ -125,6 +126,7 @@ impl AssemblerCompute {
             trace,
             state: &self.cut_state,
             callbacks: adapter,
+            workpiece_uid: self.workpiece_uid.clone(),
             size_mm,
             pixels_per_mm,
             image_source,

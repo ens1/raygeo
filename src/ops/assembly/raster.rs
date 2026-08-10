@@ -71,6 +71,7 @@ impl Assembler for RasterSpec {
         let (ops, meta) = assemble_raster(
             image_src,
             pixels_per_mm,
+            &ctx.workpiece_uid,
             self.alpha.as_deref(),
             &self.mode,
             self.line_interval_mm,
@@ -135,6 +136,7 @@ impl Assembler for RasterSpec {
 pub fn assemble_raster(
     image_src: &dyn ImageSource,
     pixels_per_mm: (f64, f64),
+    workpiece_uid: &str,
     alpha: Option<&[u8]>,
     mode: &str,
     line_interval_mm: f64,
@@ -225,7 +227,7 @@ pub fn assemble_raster(
                     wrapped
                         .ops_section_start(
                             SectionType::RasterFill,
-                            "raster",
+                            workpiece_uid,
                             Some(rm),
                         )
                         .map_err(|e| {
@@ -321,7 +323,7 @@ pub fn assemble_raster(
                     wrapped
                         .ops_section_start(
                             SectionType::RasterFill,
-                            "raster",
+                            workpiece_uid,
                             Some(rm),
                         )
                         .map_err(|e| {

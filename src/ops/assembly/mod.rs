@@ -65,6 +65,9 @@ pub struct AssembleCtx<'a> {
     pub state: &'a State,
     /// Callbacks (progress, cancellation, chunks).
     pub callbacks: &'a dyn Callbacks,
+    /// Stable identifier of the workpiece being assembled. Assemblers
+    /// copy it into explicit Ops section markers.
+    pub workpiece_uid: String,
     /// Physical size of the part in millimetres `(width, height)`.
     /// Needed by raster / shrinkwrap / frame assemblers that scale
     /// pixel coordinates into mm space.

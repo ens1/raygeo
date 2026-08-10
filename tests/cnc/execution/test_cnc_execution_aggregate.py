@@ -26,6 +26,8 @@ from raygeo.cnc.execution.specs import (
     MachineParams,
     Marker,
 )
+from raygeo.ops.transform.optimize import OptimizeSpec
+from raygeo.ops.types import CommandCategory, CommandType
 from raygeo.pipeline.request import NodeRequest
 from raygeo.pipeline.stage import StageSpec
 
@@ -69,6 +71,7 @@ def _make_aggregate(
     machine=None,
     start_markers=None,
     end_markers=None,
+    transformers=None,
 ) -> NodeRequest:
     return NodeRequest(
         key=key,
@@ -85,6 +88,7 @@ def _make_aggregate(
                 ],
                 wrap_end=wrap_end or [],
                 machine=machine or MachineParams(),
+                transformers=transformers or [],
             )
         ),
     )
@@ -153,7 +157,7 @@ def test_aggregate_two_inputs_concatenates_ops():
     ]
     completed, _ = collect_completions(nodes)
     out = aggregate_result(_by_key(completed)["agg"])
-    assert len(out.ops) == 12
+    assert len(out.ops) == 16
 
 
 # ── Markers are emitted in order ──────────────────────────────────
@@ -176,7 +180,7 @@ def test_job_markers_emitted_at_wrap_start_end():
     )
     completed, _ = collect_completions([src, agg])
     out = aggregate_result(_by_key(completed)["agg"])
-    assert len(out.ops) == 8
+    assert len(out.ops) == 10
     cmd_types = [c["type"] for c in out.ops.to_dict()["commands"]]
     assert cmd_types[0] == "JOB_START"
     assert cmd_types[-1] == "JOB_END"
@@ -231,6 +235,126 @@ def test_process_markers_preserve_params():
     assert ops.process_uid(ops.len() - 1) == "process-1"
 
 
+def test_optimize_preserves_single_workpiece_process_section_nesting():
+    src = make_contour_compute("src", workpiece_uid="wp-1")
+    agg = _make_aggregate(
+        "agg",
+        [
+            AggregateInput(
+                source_key="src",
+                placement_matrix=IDENTITY,
+                uid="wp-1",
+                target_dimensions=(0.0, 0.0),
+            )
+        ],
+        wrap_start=[
+            Marker.ProcessStart(
+                uid="process",
+                params='{"version":1}',
+                _tag=True,
+            )
+        ],
+        wrap_end=[Marker.ProcessEnd(uid="process", _tag=True)],
+        start_markers=[Marker.WorkpieceStart(uid="wp-1", _tag=True)],
+        end_markers=[Marker.WorkpieceEnd(uid="wp-1", _tag=True)],
+        transformers=[OptimizeSpec(False, False, [])],
+    )
+    completed, _ = collect_completions([src, agg])
+    ops = result_ops(_by_key(completed)["agg"])
+
+    marker_types = [
+        ops.command_type(i)
+        for i in range(ops.len())
+        if ops.category(i) == CommandCategory.MARKER
+    ]
+    assert marker_types == [
+        CommandType.PROCESS_START,
+        CommandType.WORKPIECE_START,
+        CommandType.OPS_SECTION_START,
+        CommandType.OPS_SECTION_END,
+        CommandType.WORKPIECE_END,
+        CommandType.PROCESS_END,
+    ]
+    section = next(
+        command
+        for command in ops.to_dict()["commands"]
+        if command["type"] == "OPS_SECTION_START"
+    )
+    assert section["workpiece_uid"] == "wp-1"
+
+
+def test_optimize_preserves_two_sibling_workpiece_sections():
+    sources = [
+        make_contour_compute("a", workpiece_uid="wp-a"),
+        make_contour_compute("b", workpiece_uid="wp-b"),
+    ]
+    groups = []
+    for key, uid, placement in [
+        ("a", "wp-a", _translate(100.0, 0.0)),
+        ("b", "wp-b", IDENTITY),
+    ]:
+        groups.append(
+            AggregateGroup(
+                start_markers=[Marker.WorkpieceStart(uid=uid, _tag=True)],
+                inputs=[
+                    AggregateInput(
+                        source_key=key,
+                        placement_matrix=placement,
+                        uid=uid,
+                        target_dimensions=(0.0, 0.0),
+                    )
+                ],
+                end_markers=[Marker.WorkpieceEnd(uid=uid, _tag=True)],
+            )
+        )
+    agg = NodeRequest(
+        key="agg",
+        generation_id=1,
+        stage=StageSpec.Aggregate(
+            spec=AggregateSpec(
+                wrap_start=[
+                    Marker.ProcessStart(
+                        uid="process",
+                        params='{"version":1}',
+                        _tag=True,
+                    )
+                ],
+                groups=groups,
+                wrap_end=[Marker.ProcessEnd(uid="process", _tag=True)],
+                machine=MachineParams(),
+                transformers=[OptimizeSpec(False, False, [])],
+            )
+        ),
+    )
+    completed, _ = collect_completions([*sources, agg])
+    ops = result_ops(_by_key(completed)["agg"])
+    commands = ops.to_dict()["commands"]
+
+    marker_types = [
+        ops.command_type(i)
+        for i in range(ops.len())
+        if ops.category(i) == CommandCategory.MARKER
+    ]
+    assert marker_types == [
+        CommandType.PROCESS_START,
+        CommandType.WORKPIECE_START,
+        CommandType.OPS_SECTION_START,
+        CommandType.OPS_SECTION_END,
+        CommandType.WORKPIECE_END,
+        CommandType.WORKPIECE_START,
+        CommandType.OPS_SECTION_START,
+        CommandType.OPS_SECTION_END,
+        CommandType.WORKPIECE_END,
+        CommandType.PROCESS_END,
+    ]
+    section_uids = [
+        command["workpiece_uid"]
+        for command in commands
+        if command["type"] == "OPS_SECTION_START"
+    ]
+    assert sorted(section_uids) == ["wp-a", "wp-b"]
+
+
 # ── Placement matrices ────────────────────────────────────────────
 
 
@@ -250,8 +374,16 @@ def test_placement_matrix_translates_input():
     completed, _ = collect_completions([src, agg])
     src_ops = result_ops(_by_key(completed)["src"]).to_dict()
     agg_ops = result_ops(_by_key(completed)["agg"]).to_dict()
-    src_line_to = src_ops["commands"][2]["end"]
-    agg_line_to = agg_ops["commands"][2]["end"]
+    src_line_to = next(
+        command["end"]
+        for command in src_ops["commands"]
+        if command["type"] == "LINE_TO"
+    )
+    agg_line_to = next(
+        command["end"]
+        for command in agg_ops["commands"]
+        if command["type"] == "LINE_TO"
+    )
     assert src_line_to == (10.0, 0.0, 0.0)
     assert agg_line_to == (110.0, 50.0, 0.0)
 
@@ -272,8 +404,18 @@ def test_target_dimensions_triggers_uniform_scaling():
     completed, _ = collect_completions([src, agg])
     src_ops = result_ops(_by_key(completed)["src"]).to_dict()
     agg_ops = result_ops(_by_key(completed)["agg"]).to_dict()
-    assert src_ops["commands"][2]["end"] == (10.0, 0.0, 0.0)
-    assert agg_ops["commands"][2]["end"] == (20.0, 0.0, 0.0)
+    src_line_to = next(
+        command["end"]
+        for command in src_ops["commands"]
+        if command["type"] == "LINE_TO"
+    )
+    agg_line_to = next(
+        command["end"]
+        for command in agg_ops["commands"]
+        if command["type"] == "LINE_TO"
+    )
+    assert src_line_to == (10.0, 0.0, 0.0)
+    assert agg_line_to == (20.0, 0.0, 0.0)
 
 
 def test_no_scaling_when_target_dimensions_zero():
@@ -290,12 +432,18 @@ def test_no_scaling_when_target_dimensions_zero():
         ],
     )
     completed, _ = collect_completions([src, agg])
-    src_first = result_ops(_by_key(completed)["src"]).to_dict()["commands"][1][
-        "end"
-    ]
-    agg_first = result_ops(_by_key(completed)["agg"]).to_dict()["commands"][1][
-        "end"
-    ]
+    src_commands = result_ops(_by_key(completed)["src"]).to_dict()["commands"]
+    agg_commands = result_ops(_by_key(completed)["agg"]).to_dict()["commands"]
+    src_first = next(
+        command["end"]
+        for command in src_commands
+        if command["type"] == "MOVE_TO"
+    )
+    agg_first = next(
+        command["end"]
+        for command in agg_commands
+        if command["type"] == "MOVE_TO"
+    )
     assert src_first == agg_first
 
 
@@ -382,4 +530,4 @@ def test_aggregate_chains_through_other_aggregate():
     completed, _ = collect_completions([src, inner, outer])
     outer_out = aggregate_result(_by_key(completed)["outer"])
     assert outer_out is not None
-    assert len(outer_out.ops) == 6
+    assert len(outer_out.ops) == 8

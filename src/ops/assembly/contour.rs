@@ -22,6 +22,7 @@ use crate::geo::types::Point3D;
 use crate::ops::assembly::result::AssemblyMeta;
 use crate::ops::assembly::{AssembleCtx, Assembler};
 use crate::ops::container::Ops;
+use crate::ops::enums::SectionType;
 use crate::ops::part::FaceState;
 use crate::ops::types::ToolPose;
 
@@ -62,7 +63,19 @@ impl Assembler for ContourSpec {
         if ctx.callbacks.is_cancelled() {
             return Err("cancelled".to_string());
         }
-        ctx.trace.append_ops(&ops);
+        if !ops.is_empty() {
+            ctx.trace
+                .ops_section_start(
+                    SectionType::VectorOutline,
+                    &ctx.workpiece_uid,
+                    None,
+                )
+                .map_err(|e| e.to_string())?;
+            ctx.trace.append_ops(&ops);
+            ctx.trace
+                .ops_section_end(SectionType::VectorOutline, None)
+                .map_err(|e| e.to_string())?;
+        }
         ctx.callbacks.report_progress(1.0, "contour: done");
         Ok(meta)
     }

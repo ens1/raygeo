@@ -29,6 +29,7 @@ def make_contour_compute(
     key: str,
     part: Optional[Part] = None,
     spec: Optional[ContourSpec] = None,
+    workpiece_uid: str = "",
     on_progress=None,
     on_cancelled=None,
     on_chunk=None,
@@ -39,7 +40,10 @@ def make_contour_compute(
         generation_id=generation_id,
         stage=StageSpec.Compute(
             part=part or make_square_part(),
-            params=ComputePayload(assembler=Assembler(spec or ContourSpec())),
+            params=ComputePayload(
+                assembler=Assembler(spec or ContourSpec()),
+                workpiece_uid=workpiece_uid,
+            ),
         ),
         on_progress=on_progress,
         on_cancelled=on_cancelled,

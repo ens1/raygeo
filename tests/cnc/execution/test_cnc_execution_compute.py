@@ -12,6 +12,7 @@ tests verify that:
   produce Ops matching their own input.
 """
 
+import pytest
 from conftest import (
     collect_completions,
     compute_result,
@@ -26,6 +27,7 @@ from raygeo.ops.assembly import Assembler
 from raygeo.ops.assembly.contour import ContourSpec, contour
 from raygeo.ops.part import Part
 from raygeo.ops.state import AirAssistMode
+from raygeo.ops.transform.tabs import TabsSpec
 from raygeo.ops.types import CommandType
 from raygeo.pipeline.completed import CompletedNode
 from raygeo.pipeline.execute import execute_stages
@@ -91,6 +93,68 @@ def test_compute_payload_emits_complete_initial_process_state():
     assert ops.pulse_width(5) == 37.5
     assert ops.command_type(6) == CommandType.SET_HEAD
     assert ops.head_uid(6) == "laser-2"
+
+
+def test_contour_compute_emits_owned_vector_section():
+    payload = ComputePayload(
+        assembler=Assembler(ContourSpec()),
+        workpiece_uid="wp-contour",
+    )
+    node = NodeRequest(
+        key="section",
+        generation_id=1,
+        stage=StageSpec.Compute(
+            part=make_square_part(),
+            params=payload,
+        ),
+    )
+    ops = result_ops(_run_one(node))
+    commands = ops.to_dict()["commands"]
+
+    assert commands[0] == {"type": "SET_POWER", "power": 0.0}
+    assert commands[1]["type"] == "OPS_SECTION_START"
+    assert commands[1]["workpiece_uid"] == "wp-contour"
+    assert commands[-1]["type"] == "OPS_SECTION_END"
+
+
+def test_contour_compute_tabs_apply_inside_vector_section():
+    payload = ComputePayload(
+        assembler=Assembler(ContourSpec()),
+        workpiece_uid="wp-tabs",
+        power=0.8,
+        transformers=[TabsSpec(0.25, 0.8, [(5.0, 0.0, 2.0)])],
+    )
+    node = NodeRequest(
+        key="tabs",
+        generation_id=1,
+        stage=StageSpec.Compute(
+            part=make_square_part(),
+            params=payload,
+        ),
+    )
+    ops = result_ops(_run_one(node))
+    powers = [
+        ops.power(i)
+        for i in range(ops.len())
+        if ops.command_type(i) == CommandType.SET_POWER
+    ]
+
+    assert any(power == pytest.approx(0.2) for power in powers)
+    assert any(power == pytest.approx(0.8) for power in powers)
+    assert (
+        sum(
+            ops.command_type(i) == CommandType.OPS_SECTION_START
+            for i in range(ops.len())
+        )
+        == 1
+    )
+    assert (
+        sum(
+            ops.command_type(i) == CommandType.OPS_SECTION_END
+            for i in range(ops.len())
+        )
+        == 1
+    )
 
 
 def test_contour_compute_source_dimensions_echoed():
@@ -177,7 +241,19 @@ def test_pipeline_matches_direct_contour_call():
     pipe_ops = result_ops(c).to_dict()
     direct_ops = direct.ops.to_dict()
     assert pipe_ops["commands"][0] == {"type": "SET_POWER", "power": 0.0}
-    assert pipe_ops["commands"][1:] == direct_ops["commands"]
+    pipe_motion = [
+        command
+        for command in pipe_ops["commands"]
+        if command["type"]
+        in {
+            "MOVE_TO",
+            "LINE_TO",
+            "ARC_TO",
+            "BEZIER_TO",
+            "QUADRATIC_BEZIER_TO",
+        }
+    ]
+    assert pipe_motion == direct_ops["commands"]
     assert pipe_ops["last_move_to"] == direct_ops["last_move_to"]
 
 

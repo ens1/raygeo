@@ -93,6 +93,7 @@ fn convert_stage(
                         Vec<Box<dyn crate::ops::transform::Transformer>>,
                     >>()?;
             let state_source_keys = params_ref.state_source_keys.clone();
+            let workpiece_uid = params_ref.workpiece_uid.clone();
             let profile = params_ref.profile;
             let cut_state = crate::ops::state::State {
                 power: params_ref.power,
@@ -130,6 +131,7 @@ fn convert_stage(
 
             let compute = AssemblerCompute {
                 assembler,
+                workpiece_uid,
                 part: part_inner,
                 face_id: face_id.clone(),
                 transformers,

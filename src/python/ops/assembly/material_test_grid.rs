@@ -335,8 +335,12 @@ fn generate_material_test_grid_py(
     };
 
     let mut trace = Tracelet::new();
-    let meta =
-        generate_material_test_grid(&params, &mut trace, &State::default())?;
+    let meta = generate_material_test_grid(
+        &params,
+        &mut trace,
+        &State::default(),
+        "",
+    )?;
     let trace_events = trace.drain();
     let trace_attrs = trace.attrs().cloned();
     let ops = trace.into_ops();
@@ -495,7 +499,7 @@ fn generate_material_test_grid_preview_py(
     // system used for ops rendering.
     let mut trace = Tracelet::new();
     let _meta =
-        generate_material_test_grid(&params, &mut trace, &State::default())
+        generate_material_test_grid(&params, &mut trace, &State::default(), "")
             .map_err(|e| {
                 pyo3::exceptions::PyValueError::new_err(e.to_string())
             })?;
