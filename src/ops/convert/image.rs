@@ -55,16 +55,20 @@ fn dot_width_trim_px(
 /// millimetres. Used to extend a pixel-centre endpoint out to the edge
 /// of the pixel so the scan covers the full pixel area rather than
 /// stopping at pixel centres (which shrinks the raster by up to one
-/// pixel at each end).
+/// pixel at each end). For anisotropic pixels, the directional density
+/// is the length of the unit scan direction after scaling each axis by
+/// its pixels-per-mm value. The returned extension remains parallel to
+/// the scan direction.
 fn half_pixel_mm(
     scan_line: &ScanLine,
     pixels_per_mm: (f64, f64),
 ) -> (f64, f64) {
     let (px_per_mm_x, px_per_mm_y) = pixels_per_mm;
     let (dir_x, dir_y) = scan_line.direction();
-    let half_x = 0.5 / px_per_mm_x * dir_x.abs();
-    let half_y = 0.5 / px_per_mm_y * dir_y.abs();
-    (half_x, half_y)
+    let directional_pixels_per_mm =
+        (dir_x * px_per_mm_x).hypot(dir_y * px_per_mm_y);
+    let half_length = 0.5 / directional_pixels_per_mm;
+    (half_length * dir_x.abs(), half_length * dir_y.abs())
 }
 
 fn line_endpoints_mm(

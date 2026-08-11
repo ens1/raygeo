@@ -1,8 +1,17 @@
 import numpy as np
+import pytest
 
-from raygeo.image.scan import ScanMode
+from raygeo.image.scan import ScanMode, generate_scan_lines
 from raygeo.ops import Ops
 from raygeo.ops.types import CommandType
+
+
+def _scan_segments(ops):
+    return [
+        (ops.endpoint(index - 1), ops.endpoint(index))
+        for index in range(ops.len())
+        if ops.command_type(index) == CommandType.SCAN_LINE
+    ]
 
 
 class TestFromPowerModulatedImage:
@@ -109,6 +118,88 @@ class TestFromMaskScan:
         mask = np.ones((20, 20), dtype=np.uint8)
         ops = Ops.from_mask_scan(mask, (10.0, 10.0), 0.0, 0.0, 0.1, angle=90.0)
         assert not ops.is_empty()
+
+    @pytest.mark.parametrize(
+        "scan_mode", [ScanMode.SEGMENTED, ScanMode.FULL_SWEEP]
+    )
+    def test_anisotropic_endpoint_extension_stays_parallel(self, scan_mode):
+        height, width = 180, 24
+        pixels_per_mm = (2.0, 10.0)
+        line_interval_mm = 4.0
+        mask = np.ones((height, width), dtype=np.uint8)
+        angle = 33.0
+        ops = Ops.from_mask_scan(
+            mask,
+            pixels_per_mm,
+            0.0,
+            0.0,
+            line_interval_mm,
+            angle=angle,
+            scan_mode=scan_mode,
+        )
+        scan_lines = generate_scan_lines(
+            (0, height - 1, 0, width - 1),
+            (width, height),
+            pixels_per_mm,
+            line_interval_mm,
+            angle,
+        )
+        angle_rad = np.deg2rad(angle)
+        direction = np.array([np.cos(angle_rad), -np.sin(angle_rad)])
+        segments = _scan_segments(ops)
+
+        assert segments
+        assert len(scan_lines) == len(segments)
+        ymax_mm = height / pixels_per_mm[1]
+        for scan_line, (start, end) in zip(scan_lines, segments):
+            delta = np.subtract(end[:2], start[:2])
+            cross = delta[0] * direction[1] - delta[1] * direction[0]
+            assert abs(cross) < 1e-12
+
+            first, last = scan_line.pixels[0], scan_line.pixels[-1]
+            if scan_line.index % 2:
+                first, last = last, first
+            center_start = scan_line.pixel_to_mm(*first, pixels_per_mm)
+            center_end = scan_line.pixel_to_mm(*last, pixels_per_mm)
+            center_start = (center_start[0], ymax_mm - center_start[1])
+            center_end = (center_end[0], ymax_mm - center_end[1])
+            center_length = np.linalg.norm(
+                np.subtract(center_end, center_start)
+            )
+            extended_length = np.linalg.norm(delta)
+            scan_direction = np.array(scan_line.direction())
+            directional_density = np.linalg.norm(
+                scan_direction * np.array(pixels_per_mm)
+            )
+            np.testing.assert_allclose(
+                extended_length - center_length,
+                1.0 / directional_density,
+                rtol=0,
+                atol=1e-12,
+            )
+
+    def test_isotropic_diagonal_endpoint_extension_is_unchanged(self):
+        mask = np.ones((8, 8), dtype=np.uint8)
+        ops = Ops.from_mask_scan(
+            mask,
+            (4.0, 4.0),
+            0.0,
+            0.0,
+            2.0,
+            angle=45.0,
+        )
+
+        np.testing.assert_allclose(
+            _scan_segments(ops),
+            [
+                (
+                    (0.03661165235168168, 1.9633883476483183, 0.0),
+                    (1.963388347648318, 0.036611652351681734, 0.0),
+                )
+            ],
+            rtol=0,
+            atol=1e-12,
+        )
 
 
 class TestFromMaskLines:
