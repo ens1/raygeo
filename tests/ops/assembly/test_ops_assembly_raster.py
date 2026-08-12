@@ -59,6 +59,51 @@ def test_mask_scan_default_step_power_matches_raster_default():
     assert power == pytest.approx(0.1, abs=_BYTE_TOL)
 
 
+def test_unknown_scan_strategy_is_rejected():
+    with pytest.raises(ValueError, match="Unknown scan_strategy"):
+        raster(
+            _part(),
+            mode="mask_scan",
+            line_interval_mm=1.0,
+            scan_strategy="alternating-ish",
+        )
+
+
+@pytest.mark.parametrize(
+    ("mode", "mark_type"),
+    [
+        pytest.param(
+            "power_modulated", CommandType.SCAN_LINE, id="power-modulated"
+        ),
+        pytest.param("mask_scan", CommandType.SCAN_LINE, id="mask-scan"),
+        pytest.param("dither", CommandType.SCAN_LINE, id="dither"),
+        pytest.param("multi_pass", CommandType.LINE_TO, id="multi-pass"),
+    ],
+)
+def test_unidirectional_strategy_applies_to_every_raster_mode(
+    mode,
+    mark_type,
+):
+    result = raster(
+        _part(fill=128),
+        mode=mode,
+        line_interval_mm=1.0,
+        scan_strategy="unidirectional",
+    )
+    marks = result.ops.indices_of(mark_type)
+
+    assert len(marks) > 2
+    segments = [
+        (result.ops.endpoint(index - 1), result.ops.endpoint(index))
+        for index in marks
+    ]
+    assert all(end[0] > start[0] for start, end in segments)
+    for previous, current in zip(marks, marks[1:]):
+        move = current - 1
+        assert result.ops.command_type(move) == CommandType.MOVE_TO
+        assert result.ops.endpoint(previous)[0] > result.ops.endpoint(move)[0]
+
+
 def test_dot_width_correction_reaches_raster_entry_point():
     """Must flow through raster() itself, not just Ops.from_mask_scan."""
     baseline = raster(

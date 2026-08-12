@@ -24,6 +24,7 @@ from raygeo.ops.assembly import Assembler
 from raygeo.ops.assembly.raster import RasterSpec, raster
 from raygeo.ops.part import Part
 from raygeo.ops.part.image_source import VipsChunkSource
+from raygeo.ops.types import CommandType
 from raygeo.pipeline.request import NodeRequest
 from raygeo.pipeline.stage import StageSpec
 
@@ -104,6 +105,44 @@ def test_raster_pipeline_matches_direct_call():
     assert pipe_ops["commands"][0] == {"type": "SET_POWER", "power": 0.0}
     assert pipe_ops["commands"][1:] == direct_ops["commands"]
     assert pipe_ops["last_move_to"] == direct_ops["last_move_to"]
+
+
+def test_raster_spec_propagates_unidirectional_strategy():
+    spec = RasterSpec(
+        mode="mask_scan",
+        line_interval_mm=1.0,
+        scan_strategy="unidirectional",
+    )
+    c = _run_one(_raster_node("unidirectional", spec=spec))
+    ops = result_ops(c)
+    scans = ops.indices_of(CommandType.SCAN_LINE)
+
+    assert spec.scan_strategy == "unidirectional"
+    assert len(scans) > 2
+    segments = [
+        (ops.endpoint(index - 1), ops.endpoint(index)) for index in scans
+    ]
+    assert all(end[0] > start[0] for start, end in segments)
+    for previous, current in zip(scans, scans[1:]):
+        move = current - 1
+        assert ops.command_type(move) == CommandType.MOVE_TO
+        assert ops.endpoint(previous)[0] > ops.endpoint(move)[0]
+
+
+def test_raster_spec_defaults_to_bidirectional_without_output_change():
+    default = RasterSpec(mode="mask_scan", line_interval_mm=1.0)
+    explicit = RasterSpec(
+        mode="mask_scan",
+        line_interval_mm=1.0,
+        scan_strategy="bidirectional",
+    )
+    default_ops = result_ops(_run_one(_raster_node("default", spec=default)))
+    explicit_ops = result_ops(
+        _run_one(_raster_node("explicit", spec=explicit))
+    )
+
+    assert default.scan_strategy == "bidirectional"
+    assert default_ops.to_dict() == explicit_ops.to_dict()
 
 
 def test_raster_pipeline_matches_power_modulated():

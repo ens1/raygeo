@@ -107,6 +107,42 @@ class TestFromMaskScan:
         ops = Ops.from_mask_scan(mask, (10.0, 10.0), 0.0, 0.0, 0.1)
         assert not ops.is_empty()
 
+    def test_unidirectional_marks_share_direction_with_dark_returns(self):
+        mask = np.ones((10, 10), dtype=np.uint8)
+        ops = Ops.from_mask_scan(
+            mask,
+            (10.0, 10.0),
+            0.0,
+            0.0,
+            0.2,
+            bidirectional=False,
+        )
+        scans = ops.indices_of(CommandType.SCAN_LINE)
+
+        assert len(scans) > 2
+        segments = [
+            (ops.endpoint(index - 1), ops.endpoint(index)) for index in scans
+        ]
+        assert all(end[0] > start[0] for start, end in segments)
+        for previous, current in zip(scans, scans[1:]):
+            move = current - 1
+            assert ops.command_type(move) == CommandType.MOVE_TO
+            assert ops.endpoint(previous)[0] > ops.endpoint(move)[0]
+
+    def test_explicit_bidirectional_preserves_default_output(self):
+        mask = np.ones((10, 10), dtype=np.uint8)
+        default = Ops.from_mask_scan(mask, (10.0, 10.0), 0.0, 0.0, 0.2)
+        explicit = Ops.from_mask_scan(
+            mask,
+            (10.0, 10.0),
+            0.0,
+            0.0,
+            0.2,
+            bidirectional=True,
+        )
+
+        assert explicit.to_dict() == default.to_dict()
+
     def test_step_power(self):
         mask = np.ones((10, 10), dtype=np.uint8)
         ops = Ops.from_mask_scan(

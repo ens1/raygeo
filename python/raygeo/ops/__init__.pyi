@@ -1530,7 +1530,7 @@ class Ops:
         :raises ValueError: If deserialization fails.
         """
     @staticmethod
-    def from_power_modulated_image(gray_image: typing.Any, alpha: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, sample_interval_mm: builtins.float, min_power: builtins.float = 0.0, max_power: builtins.float = 1.0, step_power: builtins.float = 1.0, num_power_levels: builtins.int = 256, angle: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED, dot_width_correction_mm: builtins.float = 0.0) -> Ops:
+    def from_power_modulated_image(gray_image: typing.Any, alpha: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, sample_interval_mm: builtins.float, min_power: builtins.float = 0.0, max_power: builtins.float = 1.0, step_power: builtins.float = 1.0, num_power_levels: builtins.int = 256, angle: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED, dot_width_correction_mm: builtins.float = 0.0, bidirectional: builtins.bool = True) -> Ops:
         r"""
         Rasterise a grayscale image with power-modulated scans.
         
@@ -1554,11 +1554,14 @@ class Ops:
         :param dot_width_correction_mm: Shortens laser firing by this
             distance at each end of every engraved run, compensating
             for the laser spot's physical width. Geometry is unaffected.
+        :param bidirectional: Alternate marking direction between rows.
+            False marks every row in the same direction and returns via
+            travel motion.
         :returns: A new :class:`Ops` container.
         :complexity: O(h * w + n * p) where h, w = image dimensions, n = scan lines, p = pixels per line
         """
     @staticmethod
-    def from_mask_scan(mask: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, step_power: builtins.float = 1.0, angle: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED, dot_width_correction_mm: builtins.float = 0.0) -> Ops:
+    def from_mask_scan(mask: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, step_power: builtins.float = 1.0, angle: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED, dot_width_correction_mm: builtins.float = 0.0, bidirectional: builtins.bool = True) -> Ops:
         r"""
         Rasterise a binary mask into scan-to commands.
         
@@ -1577,11 +1580,14 @@ class Ops:
         :param dot_width_correction_mm: Shortens laser firing by this
             distance at each end of every engraved run, compensating
             for the laser spot's physical width. Geometry is unaffected.
+        :param bidirectional: Alternate marking direction between rows.
+            False marks every row in the same direction and returns via
+            travel motion.
         :returns: A new :class:`Ops` container.
         :complexity: O(h * w + n * p) where h, w = image dimensions, n = scan lines, p = pixels per line
         """
     @staticmethod
-    def from_mask_lines(mask: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, z: builtins.float = 0.0, angle: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED) -> Ops:
+    def from_mask_lines(mask: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, z: builtins.float = 0.0, angle: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED, bidirectional: builtins.bool = True) -> Ops:
         r"""
         Rasterise a binary mask into line-to commands (no power).
         
@@ -1597,11 +1603,14 @@ class Ops:
         :param z: Z offset for the lines in mm.
         :param angle: Scan angle in degrees.
         :param scan_mode: ``ScanMode.SEGMENTED`` or ``ScanMode.FULL_SWEEP``.
+        :param bidirectional: Alternate marking direction between rows.
+            False marks every row in the same direction and returns via
+            travel motion.
         :returns: A new :class:`Ops` container.
         :complexity: O(h * w + n * p) where h, w = image dimensions, n = scan lines, p = pixels per line
         """
     @staticmethod
-    def from_multi_pass_image(gray_image: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, num_depth_levels: builtins.int, z_step_down: builtins.float, angle: builtins.float = 0.0, angle_increment: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED) -> Ops:
+    def from_multi_pass_image(gray_image: typing.Any, pixels_per_mm: tuple[builtins.float, builtins.float], offset_x_mm: builtins.float, offset_y_mm: builtins.float, line_interval_mm: builtins.float, num_depth_levels: builtins.int, z_step_down: builtins.float, angle: builtins.float = 0.0, angle_increment: builtins.float = 0.0, scan_mode: scan.ScanMode = scan.ScanMode.SEGMENTED, bidirectional: builtins.bool = True) -> Ops:
         r"""
         Rasterise a grayscale image as multiple Z-depth passes.
         
@@ -1619,6 +1628,9 @@ class Ops:
         :param angle: Initial scan angle in degrees.
         :param angle_increment: Angle added per depth layer in degrees.
         :param scan_mode: ``ScanMode.SEGMENTED`` or ``ScanMode.FULL_SWEEP``.
+        :param bidirectional: Alternate marking direction between rows.
+            False marks every row in the same direction and returns via
+            travel motion.
         :returns: A new :class:`Ops` container.
         :complexity: O(d * (h * w + n * p)) where d = depth levels, h, w = image dims, n = scan lines, p = pixels per line
         """

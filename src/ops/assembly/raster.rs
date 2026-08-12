@@ -40,6 +40,7 @@ pub struct RasterSpec {
     pub offset_x_mm: f64,
     pub offset_y_mm: f64,
     pub scan_mode: String,
+    pub scan_strategy: String,
     pub cross_hatch: bool,
     pub num_depth_levels: usize,
     pub z_step_down: f64,
@@ -89,6 +90,7 @@ impl Assembler for RasterSpec {
             self.z_step_down,
             self.angle_increment,
             self.dot_width_correction_mm,
+            &self.scan_strategy,
             ctx.callbacks,
         )
         .map_err(|e| e.to_string())?;
@@ -154,6 +156,7 @@ pub fn assemble_raster(
     z_step_down: f64,
     angle_increment: f64,
     dot_width_correction_mm: f64,
+    scan_strategy: &str,
     callbacks: &dyn Callbacks,
 ) -> RaygeoResult<(Ops, AssemblyMeta)> {
     let (w, h) = image_src.dimensions();
@@ -171,6 +174,18 @@ pub fn assemble_raster(
             return Err(RaygeoError::ContourError(format!(
                 "Unknown scan_mode '{}' — expected 'segmented' or \
                  'full_sweep'",
+                other
+            )));
+        }
+    };
+
+    let bidirectional = match scan_strategy {
+        "bidirectional" => true,
+        "unidirectional" => false,
+        other => {
+            return Err(RaygeoError::ContourError(format!(
+                "Unknown scan_strategy '{}' — expected 'bidirectional' or \
+                 'unidirectional'",
                 other
             )));
         }
@@ -204,6 +219,7 @@ pub fn assemble_raster(
             angles[0],
             angle_increment,
             scan_mode_val,
+            bidirectional,
         );
         let passes_angle1 = Ops::multi_pass_ops(
             &gray,
@@ -218,6 +234,7 @@ pub fn assemble_raster(
             angles[1],
             angle_increment,
             scan_mode_val,
+            bidirectional,
         );
         let rm = raster_mode.unwrap();
         for i in 0..passes_angle0.len().max(passes_angle1.len()) {
@@ -275,6 +292,7 @@ pub fn assemble_raster(
                         a,
                         scan_mode_val,
                         dot_width_correction_mm,
+                        bidirectional,
                     )
                 }
                 "mask_scan" | "dither" => Ops::from_mask_scan(
@@ -289,6 +307,7 @@ pub fn assemble_raster(
                     a,
                     scan_mode_val,
                     dot_width_correction_mm,
+                    bidirectional,
                 ),
                 "multi_pass" => Ops::from_multi_pass_image(
                     &gray,
@@ -303,6 +322,7 @@ pub fn assemble_raster(
                     a,
                     angle_increment,
                     scan_mode_val,
+                    bidirectional,
                 ),
                 other => {
                     return Err(RaygeoError::ContourError(format!(

@@ -3384,10 +3384,13 @@ impl PyOps {
     /// :param dot_width_correction_mm: Shortens laser firing by this
     ///     distance at each end of every engraved run, compensating
     ///     for the laser spot's physical width. Geometry is unaffected.
+    /// :param bidirectional: Alternate marking direction between rows.
+    ///     False marks every row in the same direction and returns via
+    ///     travel motion.
     /// :returns: A new :class:`Ops` container.
     /// :complexity: O(h * w + n * p) where h, w = image dimensions, n = scan lines, p = pixels per line
     #[staticmethod]
-    #[pyo3(signature = (gray_image, alpha, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, sample_interval_mm, min_power=0.0, max_power=1.0, step_power=1.0, num_power_levels=256, angle=0.0, scan_mode=PyScanMode::Segmented, dot_width_correction_mm=0.0))]
+    #[pyo3(signature = (gray_image, alpha, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, sample_interval_mm, min_power=0.0, max_power=1.0, step_power=1.0, num_power_levels=256, angle=0.0, scan_mode=PyScanMode::Segmented, dot_width_correction_mm=0.0, bidirectional=true))]
     #[allow(clippy::too_many_arguments)]
     fn from_power_modulated_image(
         py: Python<'_>,
@@ -3405,6 +3408,7 @@ impl PyOps {
         angle: f64,
         scan_mode: PyScanMode,
         dot_width_correction_mm: f64,
+        bidirectional: bool,
     ) -> PyResult<Self> {
         let (gray, h, w) = extract_flat_u8(py, gray_image)?;
         let (alp, h2, w2) = extract_flat_u8(py, alpha)?;
@@ -3427,6 +3431,7 @@ impl PyOps {
             angle,
             scan_mode.into(),
             dot_width_correction_mm,
+            bidirectional,
         );
         Ok(PyOps { inner: ops })
     }
@@ -3448,10 +3453,13 @@ impl PyOps {
     /// :param dot_width_correction_mm: Shortens laser firing by this
     ///     distance at each end of every engraved run, compensating
     ///     for the laser spot's physical width. Geometry is unaffected.
+    /// :param bidirectional: Alternate marking direction between rows.
+    ///     False marks every row in the same direction and returns via
+    ///     travel motion.
     /// :returns: A new :class:`Ops` container.
     /// :complexity: O(h * w + n * p) where h, w = image dimensions, n = scan lines, p = pixels per line
     #[staticmethod]
-    #[pyo3(signature = (mask, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, step_power=1.0, angle=0.0, scan_mode=PyScanMode::Segmented, dot_width_correction_mm=0.0))]
+    #[pyo3(signature = (mask, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, step_power=1.0, angle=0.0, scan_mode=PyScanMode::Segmented, dot_width_correction_mm=0.0, bidirectional=true))]
     #[allow(clippy::too_many_arguments)]
     fn from_mask_scan(
         py: Python<'_>,
@@ -3464,6 +3472,7 @@ impl PyOps {
         angle: f64,
         scan_mode: PyScanMode,
         dot_width_correction_mm: f64,
+        bidirectional: bool,
     ) -> PyResult<Self> {
         let (m, h, w) = extract_flat_u8(py, mask)?;
         let ops = crate::ops::Ops::from_mask_scan(
@@ -3478,6 +3487,7 @@ impl PyOps {
             angle,
             scan_mode.into(),
             dot_width_correction_mm,
+            bidirectional,
         );
         Ok(PyOps { inner: ops })
     }
@@ -3496,10 +3506,13 @@ impl PyOps {
     /// :param z: Z offset for the lines in mm.
     /// :param angle: Scan angle in degrees.
     /// :param scan_mode: ``ScanMode.SEGMENTED`` or ``ScanMode.FULL_SWEEP``.
+    /// :param bidirectional: Alternate marking direction between rows.
+    ///     False marks every row in the same direction and returns via
+    ///     travel motion.
     /// :returns: A new :class:`Ops` container.
     /// :complexity: O(h * w + n * p) where h, w = image dimensions, n = scan lines, p = pixels per line
     #[staticmethod]
-    #[pyo3(signature = (mask, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, z=0.0, angle=0.0, scan_mode=PyScanMode::Segmented))]
+    #[pyo3(signature = (mask, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, z=0.0, angle=0.0, scan_mode=PyScanMode::Segmented, bidirectional=true))]
     #[allow(clippy::too_many_arguments)]
     fn from_mask_lines(
         py: Python<'_>,
@@ -3511,6 +3524,7 @@ impl PyOps {
         z: f64,
         angle: f64,
         scan_mode: PyScanMode,
+        bidirectional: bool,
     ) -> PyResult<Self> {
         let (m, h, w) = extract_flat_u8(py, mask)?;
         let ops = crate::ops::Ops::from_mask_lines(
@@ -3524,6 +3538,7 @@ impl PyOps {
             z,
             angle,
             scan_mode.into(),
+            bidirectional,
         );
         Ok(PyOps { inner: ops })
     }
@@ -3544,10 +3559,13 @@ impl PyOps {
     /// :param angle: Initial scan angle in degrees.
     /// :param angle_increment: Angle added per depth layer in degrees.
     /// :param scan_mode: ``ScanMode.SEGMENTED`` or ``ScanMode.FULL_SWEEP``.
+    /// :param bidirectional: Alternate marking direction between rows.
+    ///     False marks every row in the same direction and returns via
+    ///     travel motion.
     /// :returns: A new :class:`Ops` container.
     /// :complexity: O(d * (h * w + n * p)) where d = depth levels, h, w = image dims, n = scan lines, p = pixels per line
     #[staticmethod]
-    #[pyo3(signature = (gray_image, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, num_depth_levels, z_step_down, angle=0.0, angle_increment=0.0, scan_mode=PyScanMode::Segmented))]
+    #[pyo3(signature = (gray_image, pixels_per_mm, offset_x_mm, offset_y_mm, line_interval_mm, num_depth_levels, z_step_down, angle=0.0, angle_increment=0.0, scan_mode=PyScanMode::Segmented, bidirectional=true))]
     #[allow(clippy::too_many_arguments)]
     fn from_multi_pass_image(
         py: Python<'_>,
@@ -3561,6 +3579,7 @@ impl PyOps {
         angle: f64,
         angle_increment: f64,
         scan_mode: PyScanMode,
+        bidirectional: bool,
     ) -> PyResult<Self> {
         let (gray, h, w) = extract_flat_u8(py, gray_image)?;
         let ops = crate::ops::Ops::from_multi_pass_image(
@@ -3576,6 +3595,7 @@ impl PyOps {
             angle,
             angle_increment,
             scan_mode.into(),
+            bidirectional,
         );
         Ok(PyOps { inner: ops })
     }

@@ -43,6 +43,8 @@ class RasterSpec:
     @property
     def scan_mode(self) -> builtins.str: ...
     @property
+    def scan_strategy(self) -> builtins.str: ...
+    @property
     def cross_hatch(self) -> builtins.bool: ...
     @property
     def num_depth_levels(self) -> builtins.int: ...
@@ -58,9 +60,9 @@ class RasterSpec:
         at each end of every continuous engraved run.
         """
     def __eq__(self, other: builtins.object, /) -> builtins.bool: ...
-    def __new__(cls, mode: builtins.str = 'power_modulated', line_interval_mm: builtins.float = 0.1, sample_interval_mm: builtins.float = 0.05, min_power: builtins.float = 0.0, max_power: builtins.float = 1.0, step_power: builtins.float = 0.1, num_power_levels: builtins.int = 10, angle: builtins.float = 0.0, offset_x_mm: builtins.float = 0.0, offset_y_mm: builtins.float = 0.0, scan_mode: builtins.str = 'segmented', cross_hatch: builtins.bool = False, num_depth_levels: builtins.int = 5, z_step_down: builtins.float = 0.0, angle_increment: builtins.float = 0.0, dot_width_correction_mm: builtins.float = 0.0, alpha: typing.Optional[typing.Sequence[builtins.int]] = None) -> RasterSpec: ...
+    def __new__(cls, mode: builtins.str = 'power_modulated', line_interval_mm: builtins.float = 0.1, sample_interval_mm: builtins.float = 0.05, min_power: builtins.float = 0.0, max_power: builtins.float = 1.0, step_power: builtins.float = 0.1, num_power_levels: builtins.int = 10, angle: builtins.float = 0.0, offset_x_mm: builtins.float = 0.0, offset_y_mm: builtins.float = 0.0, scan_mode: builtins.str = 'segmented', cross_hatch: builtins.bool = False, num_depth_levels: builtins.int = 5, z_step_down: builtins.float = 0.0, angle_increment: builtins.float = 0.0, dot_width_correction_mm: builtins.float = 0.0, alpha: typing.Optional[typing.Sequence[builtins.int]] = None, scan_strategy: builtins.str = 'bidirectional') -> RasterSpec: ...
 
-def raster(part: raygeo.ops.part.Part, alpha: numpy.ndarray | None = None, mode: str = 'power_modulated', line_interval_mm: float = 0.1, sample_interval_mm: float = 0.05, min_power: float = 0, max_power: float = 1, step_power: float = 0.1, num_power_levels: int = 10, angle: float = 0, offset_x_mm: float = 0, offset_y_mm: float = 0, scan_mode: str = 'segmented', cross_hatch: bool = False, num_depth_levels: int = 5, z_step_down: float = 0, angle_increment: float = 0, dot_width_correction_mm: float = 0) -> raygeo.ops.assembly.AssemblyResult:
+def raster(part: raygeo.ops.part.Part, alpha: numpy.ndarray | None = None, mode: str = 'power_modulated', line_interval_mm: float = 0.1, sample_interval_mm: float = 0.05, min_power: float = 0, max_power: float = 1, step_power: float = 0.1, num_power_levels: int = 10, angle: float = 0, offset_x_mm: float = 0, offset_y_mm: float = 0, scan_mode: str = 'segmented', cross_hatch: bool = False, num_depth_levels: int = 5, z_step_down: float = 0, angle_increment: float = 0, dot_width_correction_mm: float = 0, scan_strategy: str = 'bidirectional') -> raygeo.ops.assembly.AssemblyResult:
     r"""
     Rasterise a part image into scan paths.
     
@@ -100,6 +102,9 @@ def raster(part: raygeo.ops.part.Part, alpha: numpy.ndarray | None = None, mode:
     :param offset_x_mm: Global X offset in mm.
     :param offset_y_mm: Global Y offset in mm.
     :param scan_mode: ``"segmented"`` or ``"full_sweep"``.
+    :param scan_strategy: ``"bidirectional"`` alternates marking
+        direction; ``"unidirectional"`` marks every row in the
+        same direction and returns with travel motion.
     :param cross_hatch: If True, add a second pass at angle + 90°
         (default False).
     :param num_depth_levels: Number of depth layers (multi_pass only,

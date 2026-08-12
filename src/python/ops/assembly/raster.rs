@@ -79,6 +79,8 @@ pub struct PyRasterSpec {
     #[pyo3(get)]
     pub scan_mode: String,
     #[pyo3(get)]
+    pub scan_strategy: String,
+    #[pyo3(get)]
     pub cross_hatch: bool,
     #[pyo3(get)]
     pub num_depth_levels: usize,
@@ -112,6 +114,7 @@ impl PyRasterSpec {
             offset_x_mm: self.offset_x_mm,
             offset_y_mm: self.offset_y_mm,
             scan_mode: self.scan_mode,
+            scan_strategy: self.scan_strategy,
             cross_hatch: self.cross_hatch,
             num_depth_levels: self.num_depth_levels,
             z_step_down: self.z_step_down,
@@ -144,6 +147,7 @@ impl PyRasterSpec {
         angle_increment = 0.0,
         dot_width_correction_mm = 0.0,
         alpha = None,
+        scan_strategy = "bidirectional",
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -164,6 +168,7 @@ impl PyRasterSpec {
         angle_increment: f64,
         dot_width_correction_mm: f64,
         alpha: Option<Vec<u8>>,
+        scan_strategy: &str,
     ) -> Self {
         PyRasterSpec {
             mode: mode.to_string(),
@@ -177,6 +182,7 @@ impl PyRasterSpec {
             offset_x_mm,
             offset_y_mm,
             scan_mode: scan_mode.to_string(),
+            scan_strategy: scan_strategy.to_string(),
             cross_hatch,
             num_depth_levels,
             z_step_down,
@@ -211,6 +217,7 @@ impl PyRasterSpec {
         z_step_down: float = 0.0,
         angle_increment: float = 0.0,
         dot_width_correction_mm: float = 0.0,
+        scan_strategy: str = "bidirectional",
     ) -> raygeo.ops.assembly.AssemblyResult:
         """Rasterise a part image into scan paths.
 
@@ -250,6 +257,9 @@ impl PyRasterSpec {
         :param offset_x_mm: Global X offset in mm.
         :param offset_y_mm: Global Y offset in mm.
         :param scan_mode: ``"segmented"`` or ``"full_sweep"``.
+        :param scan_strategy: ``"bidirectional"`` alternates marking
+            direction; ``"unidirectional"`` marks every row in the
+            same direction and returns with travel motion.
         :param cross_hatch: If True, add a second pass at angle + 90°
             (default False).
         :param num_depth_levels: Number of depth layers (multi_pass only,
@@ -291,6 +301,7 @@ impl PyRasterSpec {
     z_step_down = 0.0,
     angle_increment = 0.0,
     dot_width_correction_mm = 0.0,
+    scan_strategy = "bidirectional",
 ))]
 fn raster_py(
     py: Python<'_>,
@@ -312,6 +323,7 @@ fn raster_py(
     z_step_down: f64,
     angle_increment: f64,
     dot_width_correction_mm: f64,
+    scan_strategy: &str,
 ) -> PyResult<PyAssemblyResult> {
     let pixels_per_mm = part.inner.pixels_per_mm.ok_or_else(|| {
         PyValueError::new_err("Part has no pixels_per_mm — required for raster")
@@ -360,6 +372,7 @@ fn raster_py(
         z_step_down,
         angle_increment,
         dot_width_correction_mm,
+        scan_strategy,
         &NoCallbacks,
     )?;
     Ok(PyAssemblyResult::from_parts(ops, meta, None, vec![]))

@@ -19,8 +19,8 @@ fn convert_y_to_output(y_mm: f64, ymax_mm: f64) -> f64 {
     ymax_mm - y_mm
 }
 
-fn is_reversed(scan_line_index: i64) -> bool {
-    (scan_line_index % 2) != 0
+fn is_reversed(scan_line_index: i64, bidirectional: bool) -> bool {
+    bidirectional && (scan_line_index % 2) != 0
 }
 
 /// Samples per mm along `scan_line`'s own sampled span (not an assumed
@@ -413,6 +413,7 @@ impl Ops {
         angle: f64,
         scan_mode: ScanMode,
         dot_width_correction_mm: f64,
+        bidirectional: bool,
     ) -> Ops {
         let mut ops = Ops::new();
         let ymax_mm =
@@ -460,7 +461,7 @@ impl Ops {
                 pixels_per_mm,
                 dot_width_correction_mm,
             );
-            let rev = is_reversed(scan_line.index);
+            let rev = is_reversed(scan_line.index, bidirectional);
 
             match scan_mode {
                 ScanMode::FullSweep => process_power_full_sweep(
@@ -502,6 +503,7 @@ impl Ops {
         angle: f64,
         scan_mode: ScanMode,
         dot_width_correction_mm: f64,
+        bidirectional: bool,
     ) -> Ops {
         let mut ops = Ops::new();
         let ymax_mm =
@@ -538,7 +540,7 @@ impl Ops {
                 pixels_per_mm,
                 dot_width_correction_mm,
             );
-            let rev = is_reversed(scan_line.index);
+            let rev = is_reversed(scan_line.index, bidirectional);
 
             match scan_mode {
                 ScanMode::FullSweep => process_scan_full_sweep(
@@ -579,6 +581,7 @@ impl Ops {
         z: f64,
         angle: f64,
         scan_mode: ScanMode,
+        bidirectional: bool,
     ) -> Ops {
         let mut ops = Ops::new();
         let ymax_mm =
@@ -610,7 +613,7 @@ impl Ops {
                 continue;
             }
 
-            let rev = is_reversed(scan_line.index);
+            let rev = is_reversed(scan_line.index, bidirectional);
 
             match scan_mode {
                 ScanMode::FullSweep => process_line_full_sweep(
@@ -651,6 +654,7 @@ impl Ops {
         angle: f64,
         angle_increment: f64,
         scan_mode: ScanMode,
+        bidirectional: bool,
     ) -> Ops {
         let passes = Self::multi_pass_ops(
             gray_image,
@@ -665,6 +669,7 @@ impl Ops {
             angle,
             angle_increment,
             scan_mode,
+            bidirectional,
         );
         let mut ops = Ops::new();
         for p in passes {
@@ -687,6 +692,7 @@ impl Ops {
         angle: f64,
         angle_increment: f64,
         scan_mode: ScanMode,
+        bidirectional: bool,
     ) -> Vec<Ops> {
         let mut passes: Vec<Ops> = Vec::new();
 
@@ -724,6 +730,7 @@ impl Ops {
                 z_offset,
                 pass_angle,
                 scan_mode,
+                bidirectional,
             );
             passes.push(pass_ops);
         }
